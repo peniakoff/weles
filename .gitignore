@@ -1,0 +1,32 @@
+# Binaries
+/bin/
+/bootstrap
+/server
+*.exe
+*.test
+
+# Go
+/vendor/
+*.out
+coverage.out
+coverage.html
+
+# Local / secrets (production app allowlists stay out of git)
+config/apps.yaml
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# SAM / AWS
+.aws-sam/
+samconfig.toml
+packaged.yaml
+
+# Cursor local (project rules/skills are committed)
+.cursor/*.log

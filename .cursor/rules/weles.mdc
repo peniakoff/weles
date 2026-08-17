@@ -1,0 +1,30 @@
+---
+description: Weles project conventions — English docs, no real consumer names in public git, Keep a Changelog, respect ROADMAP scope, no PII in logs.
+alwaysApply: true
+---
+
+# Weles conventions
+
+## Language and privacy
+
+- All code, comments, README, OpenAPI, ROADMAP, CHANGELOG, and `docs/` are **English**.
+- **Never** name real integrating products, production domains, or consumer repositories in public docs, examples, fixtures, or committed config.
+- Use only fictional examples: `example-app`, `app.example.com`, `user@example.com`.
+- Real allowlists belong in deploy-time `WELLS_APPS_YAML` / gitignored `config/apps.yaml` / private notes — not in git.
+
+## Scope
+
+- Do not implement features outside the current ROADMAP version unless the user explicitly requests it.
+- When starting a planned item, update `ROADMAP.md` status and add a `CHANGELOG.md` `[Unreleased]` entry.
+
+## Code
+
+- Prefer small packages, interfaces for Turnstile/SES, table-driven tests.
+- Never log `message`, `email`, or Turnstile tokens.
+- Email notifications are plaintext only (no HTML).
+- No API keys as browser authentication.
+
+## Releases
+
+- Follow Keep a Changelog categories: Added, Changed, Deprecated, Removed, Fixed, Security.
+- SemVer: features MINOR, fixes PATCH, breaking API MAJOR.
