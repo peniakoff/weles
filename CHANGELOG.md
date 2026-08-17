@@ -1,0 +1,29 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- Feedback intake API (`POST /v1/feedback`) with Cloudflare Turnstile verification, per-app origin and host allowlisting, and Amazon SES plaintext email delivery (verified From/To; optional Reply-To when the submitter provides an email).
+- Dual runtime: AWS Lambda (`provided.al2023` arm64) via SAM, and Docker / local `net/http` server.
+- OpenAPI description, integration guide (Vue and Next.js examples on `example-app`), security and deploy docs.
+- Project Cursor rules and skills for changelog/roadmap hygiene and security defaults.
+- GitHub Actions CI on push/PR to `main` (`go vet`, race tests, server and Lambda builds, SAM validate) and an OIDC-based deploy workflow.
+
+### Security
+
+- Load the Turnstile secret from an SSM SecureString at startup instead of placing it in the Lambda environment.
+- Prefer `RemoteAddr` for Turnstile `remoteip` and ignore client-controlled `X-Forwarded-For` unless `WELLS_TRUST_PROXY_XFF=true`.
+- Grant API Gateway permission to write HTTP API access logs via a CloudWatch Logs resource policy.
+- Validate SES From/To as bare email addresses at process startup (reject display names and CR/LF).
+
+### Changed
+
+- Reload the apps allowlist from SSM on a TTL (default 5 minutes when using SSM) so allowlist edits apply without redeploying.
+- Normalize SSM parameter names to always start with `/` in config loading and deploy CI.
+- Support an optional `SesIdentity` SAM parameter (GitHub var `SES_IDENTITY`) so Lambda IAM can target a verified domain identity when From is an address on that domain.

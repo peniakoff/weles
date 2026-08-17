@@ -1,0 +1,217 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Weles v1 — feedback intake API (HTTP API + Lambda + SES email)
+
+Parameters:
+  NotificationEmail:
+    Type: String
+    Description: Operator inbox that receives SES notifications (To address).
+  FromEmail:
+    Type: String
+    Default: ""
+    Description: Verified SES From address. Leave empty to use NotificationEmail as From.
+  SesIdentity:
+    Type: String
+    Default: ""
+    Description: >
+      SES identity name used in the Lambda IAM policy (email address or verified domain).
+      Leave empty to use the From address. Set to the domain (e.g. example.com) when only
+      the domain identity is verified and From is an address on that domain.
+  StageName:
+    Type: String
+    Default: prod
+  AppsParameterName:
+    Type: String
+    Default: /weles/prod/apps
+    Description: Existing SSM String parameter holding apps registry YAML (created by deploy CI). Must start with /.
+  TurnstileParameterName:
+    Type: String
+    Default: /weles/prod/turnstile-secret
+    Description: Existing SSM SecureString parameter holding the Turnstile secret (created by deploy CI). Must start with /.
+  ThrottleRate:
+    Type: Number
+    Default: 1
+    MinValue: 1
+  ThrottleBurst:
+    Type: Number
+    Default: 5
+    MinValue: 1
+
+Conditions:
+  HasFromEmail: !Not [!Equals [!Ref FromEmail, ""]]
+  HasSesIdentity: !Not [!Equals [!Ref SesIdentity, ""]]
+
+Globals:
+  Function:
+    Timeout: 15
+    MemorySize: 128
+    Architectures:
+      - arm64
+
+Resources:
+  FeedbackFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/weles-feedback-${StageName}
+      RetentionInDays: 14
+
+  FeedbackFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - FeedbackFunctionLogGroup
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub weles-feedback-${StageName}
+      Runtime: provided.al2023
+      Handler: bootstrap
+      CodeUri: .
+      Description: Weles feedback intake
+      ReservedConcurrentExecutions: 1
+      Environment:
+        Variables:
+          WELLS_TURNSTILE_MODE: cloudflare
+          WELLS_TURNSTILE_SSM: !Ref TurnstileParameterName
+          WELLS_NOTIFIER: ses
+          WELLS_SES_FROM: !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
+          WELLS_SES_TO: !Ref NotificationEmail
+          WELLS_APPS_SSM: !Ref AppsParameterName
+          WELLS_APPS_RELOAD_SECONDS: "300"
+          WELLS_LOG_LEVEL: info
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+              Resource:
+                - !Sub
+                    - arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${ResolvedIdentity}
+                    - ResolvedIdentity: !If
+                        - HasSesIdentity
+                        - !Ref SesIdentity
+                        - !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource:
+                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${AppsParameterName}
+                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${TurnstileParameterName}
+      Events:
+        FeedbackPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/feedback
+            Method: POST
+        FeedbackOptions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/feedback
+            Method: OPTIONS
+        Health:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /healthz
+            Method: GET
+
+  HttpApiAccessLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/apigateway/weles-${StageName}
+      RetentionInDays: 14
+
+  HttpApiAccessLogResourcePolicy:
+    Type: AWS::Logs::ResourcePolicy
+    Properties:
+      PolicyName: !Sub weles-apigw-access-${StageName}
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AWSLogDeliveryWrite",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "delivery.logs.amazonaws.com"
+              },
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": [
+                "${HttpApiAccessLogs.Arn}",
+                "${HttpApiAccessLogs.Arn}:*"
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": "${AWS::AccountId}"
+                }
+              }
+            },
+            {
+              "Sid": "APIGatewayPushToCloudWatchLogs",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "apigateway.amazonaws.com"
+              },
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": [
+                "${HttpApiAccessLogs.Arn}",
+                "${HttpApiAccessLogs.Arn}:*"
+              ]
+            }
+          ]
+        }
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    DependsOn:
+      - HttpApiAccessLogResourcePolicy
+    Properties:
+      StageName: !Ref StageName
+      DefaultRouteSettings:
+        ThrottlingRateLimit: !Ref ThrottleRate
+        ThrottlingBurstLimit: !Ref ThrottleBurst
+      AccessLogSettings:
+        DestinationArn: !GetAtt HttpApiAccessLogs.Arn
+        Format: '$context.requestId $context.httpMethod $context.path $context.status $context.integrationErrorMessage'
+
+Outputs:
+  ApiEndpoint:
+    Description: Base URL of the HTTP API
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}
+  FeedbackURL:
+    Description: Full feedback endpoint URL
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/v1/feedback
+  NotificationTo:
+    Description: Operator inbox (SES To address)
+    Value: !Ref NotificationEmail
+  NotificationFrom:
+    Description: SES From address (must be a verified SES identity or covered by SesIdentity)
+    Value: !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
+  SesIamIdentity:
+    Description: SES identity name used in the Lambda IAM SendEmail policy
+    Value: !If
+      - HasSesIdentity
+      - !Ref SesIdentity
+      - !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
+  AppsSSMParameter:
+    Description: SSM parameter name for the apps registry YAML
+    Value: !Ref AppsParameterName
+  TurnstileSSMParameter:
+    Description: SSM parameter name for the Turnstile secret
+    Value: !Ref TurnstileParameterName
+  VerifySESHint:
+    Description: Before first send, verify the From address or its domain in Amazon SES
+    Value: !Sub
+      - Verify SES identity for From=${ResolvedFrom} (IAM identity=${ResolvedIdentity}) in ${AWS::Region}; sandbox also requires a verified To
+      - ResolvedFrom: !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
+        ResolvedIdentity: !If
+          - HasSesIdentity
+          - !Ref SesIdentity
+          - !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]

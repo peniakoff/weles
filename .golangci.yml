@@ -1,0 +1,27 @@
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - revive
+    - unconvert
+    - whitespace
+
+linters-settings:
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: error-return
+      - name: exported
+      - name: package-comments
+      - name: var-naming
+
+run:
+  timeout: 5m
+
+issues:
+  exclude-use-default: false

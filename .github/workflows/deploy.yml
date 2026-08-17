@@ -1,0 +1,103 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "cmd/**"
+      - "internal/**"
+      - "config/**"
+      - "template.yaml"
+      - "Makefile"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/deploy.yml"
+
+concurrency:
+  group: weles-deploy
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+          cache: true
+
+      - name: Install SAM CLI
+        run: pip install aws-sam-cli
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Publish secrets and allowlist to SSM
+        env:
+          APPS_CONFIG: ${{ secrets.APPS_CONFIG }}
+          TURNSTILE_SECRET: ${{ secrets.TURNSTILE_SECRET }}
+          APPS_PARAMETER_NAME: ${{ vars.APPS_PARAMETER_NAME }}
+          TURNSTILE_PARAMETER_NAME: ${{ vars.TURNSTILE_PARAMETER_NAME }}
+        run: |
+          normalize() {
+            local n="$1"
+            if [[ "$n" != /* ]]; then
+              n="/$n"
+            fi
+            printf '%s' "$n"
+          }
+          APPS_PARAM="$(normalize "${APPS_PARAMETER_NAME:-/weles/prod/apps}")"
+          TURNSTILE_PARAM="$(normalize "${TURNSTILE_PARAMETER_NAME:-/weles/prod/turnstile-secret}")"
+          echo "APPS_PARAM=$APPS_PARAM" >> "$GITHUB_ENV"
+          echo "TURNSTILE_PARAM=$TURNSTILE_PARAM" >> "$GITHUB_ENV"
+
+          aws ssm put-parameter \
+            --name "$APPS_PARAM" \
+            --type String \
+            --value "$APPS_CONFIG" \
+            --overwrite
+
+          aws ssm put-parameter \
+            --name "$TURNSTILE_PARAM" \
+            --type SecureString \
+            --value "$TURNSTILE_SECRET" \
+            --overwrite
+
+      - name: SAM build
+        run: sam build
+
+      - name: SAM deploy
+        env:
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          FROM_EMAIL: ${{ vars.FROM_EMAIL }}
+          SES_IDENTITY: ${{ vars.SES_IDENTITY }}
+        run: |
+          OVERRIDES=(
+            "NotificationEmail=${NOTIFICATION_EMAIL}"
+            "AppsParameterName=${APPS_PARAM}"
+            "TurnstileParameterName=${TURNSTILE_PARAM}"
+          )
+          if [[ -n "${FROM_EMAIL:-}" ]]; then
+            OVERRIDES+=("FromEmail=${FROM_EMAIL}")
+          fi
+          if [[ -n "${SES_IDENTITY:-}" ]]; then
+            OVERRIDES+=("SesIdentity=${SES_IDENTITY}")
+          fi
+          sam deploy \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --stack-name weles \
+            --capabilities CAPABILITY_IAM \
+            --resolve-s3 \
+            --parameter-overrides "${OVERRIDES[@]}"

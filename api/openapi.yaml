@@ -1,0 +1,149 @@
+openapi: 3.0.3
+info:
+  title: Weles Feedback API
+  version: 1.0.0
+  description: |
+    Universal feedback intake API. Public examples use `example-app` on `app.example.com`.
+  license:
+    name: MIT
+servers:
+  - url: https://api.example.com/prod
+    description: Example deployment base (replace with your API Gateway URL)
+paths:
+  /healthz:
+    get:
+      summary: Liveness check
+      operationId: healthz
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /v1/feedback:
+    post:
+      summary: Submit feedback
+      operationId: submitFeedback
+      parameters:
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Browser origin; must be allowlisted when present
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackSubmission"
+            example:
+              appId: example-app
+              category: bug
+              message: The calculated value is wrong after switching units.
+              email: user@example.com
+              context:
+                locale: en
+                pageUrl: https://app.example.com/en/tools/roof
+                metadata:
+                  toolId: roof
+                  toolName: Roof calculator
+              turnstileToken: "<token>"
+              submittedAt: "2026-08-17T18:00:00.000Z"
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reportId]
+                properties:
+                  reportId:
+                    type: string
+                    example: 01J2FEEDBACK8M7QK3R5C4
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Throttled
+        "503":
+          description: Notification backend unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    options:
+      summary: CORS preflight
+      operationId: feedbackOptions
+      responses:
+        "204":
+          description: No content
+        "403":
+          description: Origin not allowlisted
+components:
+  schemas:
+    FeedbackSubmission:
+      type: object
+      required: [appId, category, message, context, turnstileToken]
+      additionalProperties: true
+      properties:
+        appId:
+          type: string
+          maxLength: 64
+        category:
+          type: string
+          enum: [bug, suggestion, other]
+        message:
+          type: string
+          minLength: 10
+          maxLength: 4000
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Optional contact address; used as Reply-To on the operator notification (never as From)
+        context:
+          $ref: "#/components/schemas/FeedbackContext"
+        turnstileToken:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+    FeedbackContext:
+      type: object
+      required: [locale, pageUrl]
+      properties:
+        locale:
+          type: string
+          maxLength: 16
+        pageUrl:
+          type: string
+          format: uri
+          maxLength: 2048
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+            maxLength: 256
+          maxProperties: 10
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: bad request
