@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OpenAPI description, integration guide (Vue and Next.js examples on `example-app`), security and deploy docs.
 - Project Cursor rules and skills for changelog/roadmap hygiene and security defaults.
 - GitHub Actions CI on push/PR to `main` (`go vet`, race tests, server and Lambda builds, SAM validate) and an OIDC-based deploy workflow.
+- Project icon and GitHub social preview artwork in the README.
 
 ### Security
 

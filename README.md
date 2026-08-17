@@ -1,8 +1,12 @@
+![Weles emblem: a horned threshold with a leaf in the gate](docs/images/icon.png)
+
 # weles
 
 The bridge between you and your users. A universal feedback intake API that collects bug reports and suggestions from web apps and delivers them to an operator inbox.
 
 Named after **Veles** (Weles), the Slavic god of the underworld, waters, and cattle — a guardian of thresholds. This service sits between product UIs and the people who maintain them.
+
+![Night river ford with wooden posts and a faint serpent in the water](docs/images/social-preview.jpg)
 
 ## Features (v1)
 
