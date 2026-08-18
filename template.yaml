@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Weles v1 — feedback intake API (HTTP API + Lambda + SES email)
+Description: Weles v1 - feedback intake API (HTTP API + Lambda + SES email)
 
 Parameters:
   NotificationEmail:
@@ -67,7 +67,6 @@ Resources:
       Handler: bootstrap
       CodeUri: .
       Description: Weles feedback intake
-      ReservedConcurrentExecutions: 1
       Environment:
         Variables:
           WELLS_TURNSTILE_MODE: cloudflare
