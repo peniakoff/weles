@@ -257,7 +257,8 @@ type Env struct {
 	AWSRegion        string
 	MaxBodyBytes     int64
 	LogLevel         string
-	TrustProxyXFF    bool // when true, prefer first X-Forwarded-For hop
+	TrustProxyXFF    bool   // when true, prefer first X-Forwarded-For hop
+	APIStage         string // API Gateway HTTP API stage; stripped from Lambda request paths
 }
 
 // LoadEnv reads configuration from environment variables with safe defaults for local use.
@@ -278,6 +279,7 @@ func LoadEnv() Env {
 		MaxBodyBytes:    getenvInt64("WELLS_MAX_BODY_BYTES", 8*1024),
 		LogLevel:        strings.ToLower(getenv("WELLS_LOG_LEVEL", "info")),
 		TrustProxyXFF:   getenvBool("WELLS_TRUST_PROXY_XFF", false),
+		APIStage:        strings.Trim(strings.TrimSpace(os.Getenv("WELLS_API_STAGE")), "/"),
 	}
 }
 

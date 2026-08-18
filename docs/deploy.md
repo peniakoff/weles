@@ -22,7 +22,7 @@ Stack: **AWS SAM** → API Gateway **HTTP API** → Lambda **`provided.al2023` a
 | `SesIdentity` | Optional SES identity name for the Lambda IAM policy (email **or** verified domain). Empty means use the From address. When only a **domain** identity is verified, set this to the domain (e.g. `example.com`) while `FromEmail` is an address on that domain |
 | `AppsParameterName` | SSM parameter for apps YAML (default `/weles/prod/apps`, **must start with `/`**) |
 | `TurnstileParameterName` | SSM SecureString for Turnstile secret (default `/weles/prod/turnstile-secret`, **must start with `/`**) |
-| `StageName` | Default `prod` |
+| `StageName` | Default `prod`. Public URLs include this segment (`…/prod/healthz`). Lambda strips it before the Go mux via `WELLS_API_STAGE`. Use `$default` only if you want URLs without a stage prefix. |
 | `ThrottleRate` / `ThrottleBurst` | Defaults `1` / `5` |
 
 **Do not commit** production allowlists or secrets. Publish them to SSM before (or via) deploy:
@@ -74,7 +74,8 @@ The first deploy of this SES revision **deletes** the former SNS topic and email
 1. Verify the SES From identity (and To if still in sandbox).
 2. Note stack outputs `FeedbackURL` and `ApiEndpoint`.
 3. Point integrating apps at `FeedbackURL`.
-4. Smoke-test from an allowlisted origin with a real Turnstile token.
+4. Smoke-test liveness: `GET {ApiEndpoint}/healthz` should return JSON `{"status":"ok"}`.
+5. Smoke-test from an allowlisted origin with a real Turnstile token.
 
 ## Local / Docker
 

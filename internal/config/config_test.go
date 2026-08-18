@@ -102,6 +102,24 @@ func TestLoadAppsFile_Missing(t *testing.T) {
 	}
 }
 
+func TestLoadEnv_APIStage(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"", ""},
+		{"prod", "prod"},
+		{"/prod/", "prod"},
+		{"  staging  ", "staging"},
+		{"$default", "$default"},
+	}
+	for _, tc := range tests {
+		t.Setenv("WELLS_API_STAGE", tc.in)
+		if got := config.LoadEnv().APIStage; got != tc.want {
+			t.Fatalf("WELLS_API_STAGE=%q → %q want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestNormalizeSSMName(t *testing.T) {
 	tests := []struct {
 		in, want string

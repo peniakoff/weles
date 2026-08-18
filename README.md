@@ -71,6 +71,7 @@ make test
 | `AWS_REGION` | `eu-central-1` | AWS region |
 | `WELLS_MAX_BODY_BYTES` | `8192` | Max JSON body size |
 | `WELLS_LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
+| `WELLS_API_STAGE` | _(empty)_ | API Gateway HTTP API stage name; Lambda strips `/{stage}` from the request path (SAM sets this from `StageName`) |
 
 Production app allowlists (real origins/hosts) must **not** be committed. Use `config/apps.example.yaml` as the public template and publish real values to SSM (`WELLS_APPS_SSM`) at deploy time.
 
