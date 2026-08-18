@@ -8,6 +8,7 @@ import (
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 
 	"github.com/peniakoff/weles/internal/app"
+	"github.com/peniakoff/weles/internal/httpapi"
 )
 
 func main() {
@@ -16,6 +17,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("startup: %v", err)
 	}
-	adapter := httpadapter.NewV2(deps.Handler())
+	handler := httpapi.StripStagePrefix(deps.Env.APIStage, deps.Handler())
+	adapter := httpadapter.NewV2(handler)
 	lambda.Start(adapter.ProxyWithContext)
 }

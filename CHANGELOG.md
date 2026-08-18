@@ -28,3 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reload the apps allowlist from SSM on a TTL (default 5 minutes when using SSM) so allowlist edits apply without redeploying.
 - Normalize SSM parameter names to always start with `/` in config loading and deploy CI.
 - Support an optional `SesIdentity` SAM parameter (GitHub var `SES_IDENTITY`) so Lambda IAM can target a verified domain identity when From is an address on that domain.
+
+### Fixed
+
+- Strip the API Gateway HTTP API stage prefix (for example `/prod`) before ServeMux matching so `GET /healthz` and `POST /v1/feedback` work on the named-stage execute-api URL.

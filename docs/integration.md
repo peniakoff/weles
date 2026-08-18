@@ -12,6 +12,8 @@ Public examples use the fictional app `example-app` on `https://app.example.com`
 
    `https://{api-id}.execute-api.{region}.amazonaws.com/prod/v1/feedback`
 
+   App paths are `/v1/feedback` and `/healthz`. The `/prod` segment is the API Gateway stage (SAM `StageName`), not part of the mux routes.
+
 ## Request
 
 `POST /v1/feedback`  

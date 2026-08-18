@@ -309,3 +309,99 @@ func TestHealthz(t *testing.T) {
 		t.Fatalf("status=%d", rec.Code)
 	}
 }
+
+func TestHealthz_StagePrefixWithoutStrip_NotFound(t *testing.T) {
+	h := testServer(t, nil)
+	req := httptest.NewRequest(http.MethodGet, "/prod/healthz", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestStripStagePrefix_APIGatewayNamedStage(t *testing.T) {
+	pub := &recordingPublisher{}
+	h := httpapi.StripStagePrefix("prod", testServer(t, pub))
+
+	t.Run("GET /prod/healthz", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/prod/healthz", nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+		}
+		if rec.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("missing security header")
+		}
+		var resp map[string]string
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatal(err)
+		}
+		if resp["status"] != "ok" {
+			t.Fatalf("status=%q", resp["status"])
+		}
+	})
+
+	t.Run("POST /prod/v1/feedback", func(t *testing.T) {
+		raw, err := json.Marshal(validBody())
+		if err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequest(http.MethodPost, "/prod/v1/feedback", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", "https://app.example.com")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusAccepted {
+			t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("OPTIONS /prod/v1/feedback", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodOptions, "/prod/v1/feedback", nil)
+		req.Header.Set("Origin", "https://app.example.com")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("status=%d", rec.Code)
+		}
+	})
+
+	t.Run("unprefixed /healthz still works", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+func TestStripStagePrefix_Table(t *testing.T) {
+	tests := []struct {
+		name     string
+		stage    string
+		path     string
+		wantCode int
+	}{
+		{name: "empty stage leaves prefix unmatched", stage: "", path: "/prod/healthz", wantCode: http.StatusNotFound},
+		{name: "default stage is a no-op", stage: "$default", path: "/healthz", wantCode: http.StatusOK},
+		{name: "default stage does not strip literal $default", stage: "$default", path: "/$default/healthz", wantCode: http.StatusNotFound},
+		{name: "trims slashes on stage", stage: "/prod/", path: "/prod/healthz", wantCode: http.StatusOK},
+		{name: "does not strip a longer first segment", stage: "prod", path: "/production/healthz", wantCode: http.StatusNotFound},
+		{name: "other stage name", stage: "staging", path: "/staging/healthz", wantCode: http.StatusOK},
+		{name: "wrong stage left intact", stage: "staging", path: "/prod/healthz", wantCode: http.StatusNotFound},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := httpapi.StripStagePrefix(tc.stage, testServer(t, nil))
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tc.wantCode {
+				t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
