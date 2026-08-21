@@ -16,32 +16,18 @@ import (
 	"github.com/peniakoff/weles/internal/notify"
 )
 
-func TestNewSES_RequiresFromAndTo(t *testing.T) {
-	if _, err := notify.NewSES(context.Background(), "eu-central-1", "", "ops@example.com", nil); err == nil {
-		t.Fatal("expected error for empty from")
+func testRegistry(t *testing.T, yaml string) *config.Registry {
+	t.Helper()
+	reg, err := config.ParseAppsYAML([]byte(yaml))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := notify.NewSES(context.Background(), "eu-central-1", "noreply@example.com", "", nil); err == nil {
-		t.Fatal("expected error for empty to")
-	}
+	return reg
 }
 
-func TestNewSES_RejectsInvalidAddresses(t *testing.T) {
-	tests := []struct {
-		name string
-		from string
-		to   string
-	}{
-		{name: "bad from", from: "not-an-email", to: "ops@example.com"},
-		{name: "bad to", from: "noreply@example.com", to: "not-an-email"},
-		{name: "display name from", from: "Ops <ops@example.com>", to: "ops@example.com"},
-		{name: "crlf from", from: "noreply@example.com\ninjected", to: "ops@example.com"},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if _, err := notify.NewSES(context.Background(), "eu-central-1", tc.from, tc.to, nil); err == nil {
-				t.Fatal("expected error")
-			}
-		})
+func TestNewSES_RequiresRegistry(t *testing.T) {
+	if _, err := notify.NewSES(context.Background(), "eu-central-1", nil); err == nil {
+		t.Fatal("expected error for nil registry")
 	}
 }
 
@@ -59,8 +45,16 @@ func (f *fakeSES) SendEmail(_ context.Context, params *sesv2.SendEmailInput, _ .
 }
 
 func TestSES_Publish(t *testing.T) {
+	reg := testRegistry(t, `
+apps:
+  - id: example-app
+    origins: ["https://app.example.com"]
+    hosts: ["app.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
+`)
 	fake := &fakeSES{}
-	pub := &notify.SES{Client: fake, From: "noreply@example.com", To: "ops@example.com"}
+	pub := &notify.SES{Client: fake, Registry: reg}
 	report := &feedback.Report{
 		ID:       "01TESTREPORTID",
 		AppID:    "example-app",
@@ -76,10 +70,10 @@ func TestSES_Publish(t *testing.T) {
 	if fake.last == nil {
 		t.Fatal("expected SendEmail call")
 	}
-	if fake.last.FromEmailAddress == nil || *fake.last.FromEmailAddress != pub.From {
+	if fake.last.FromEmailAddress == nil || *fake.last.FromEmailAddress != "noreply@example.com" {
 		t.Fatalf("from=%v", fake.last.FromEmailAddress)
 	}
-	if fake.last.Destination == nil || len(fake.last.Destination.ToAddresses) != 1 || fake.last.Destination.ToAddresses[0] != pub.To {
+	if fake.last.Destination == nil || len(fake.last.Destination.ToAddresses) != 1 || fake.last.Destination.ToAddresses[0] != "ops@example.com" {
 		t.Fatalf("destination=%v", fake.last.Destination)
 	}
 	if len(fake.last.ReplyToAddresses) != 1 || fake.last.ReplyToAddresses[0] != report.Email {
@@ -110,8 +104,16 @@ func TestSES_Publish(t *testing.T) {
 }
 
 func TestSES_Publish_NoReplyToWithoutEmail(t *testing.T) {
+	reg := testRegistry(t, `
+apps:
+  - id: example-app
+    origins: ["https://app.example.com"]
+    hosts: ["app.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
+`)
 	fake := &fakeSES{}
-	pub := &notify.SES{Client: fake, From: "noreply@example.com", To: "ops@example.com"}
+	pub := &notify.SES{Client: fake, Registry: reg}
 	err := pub.Publish(context.Background(), &feedback.Report{
 		ID:       "01TEST",
 		AppID:    "example-app",
@@ -127,29 +129,36 @@ func TestSES_Publish_NoReplyToWithoutEmail(t *testing.T) {
 }
 
 func TestSES_Publish_Error(t *testing.T) {
+	reg := testRegistry(t, `
+apps:
+  - id: example-app
+    origins: ["https://app.example.com"]
+    hosts: ["app.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
+`)
 	fake := &fakeSES{err: errors.New("boom")}
-	pub := &notify.SES{Client: fake, From: "noreply@example.com", To: "ops@example.com"}
+	pub := &notify.SES{Client: fake, Registry: reg}
 	err := pub.Publish(context.Background(), &feedback.Report{ID: "1", AppID: "example-app", Category: "bug", Message: "x"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
 }
 
-func TestSES_Publish_PerAppEmailOverrides(t *testing.T) {
-	reg, err := config.ParseAppsYAML([]byte(`
+func TestSES_Publish_PerAppEmails(t *testing.T) {
+	reg := testRegistry(t, `
 apps:
   - id: example-app
     origins: ["https://app.example.com"]
     hosts: ["app.example.com"]
     notificationEmail: app-ops@example.com
     fromEmail: app-noreply@example.com
-  - id: bare-app
-    origins: ["https://bare.example.com"]
-    hosts: ["bare.example.com"]
-`))
-	if err != nil {
-		t.Fatal(err)
-	}
+  - id: other-app
+    origins: ["https://other.example.com"]
+    hosts: ["other.example.com"]
+    notificationEmail: other-ops@example.com
+    fromEmail: other-noreply@example.com
+`)
 
 	tests := []struct {
 		name     string
@@ -158,33 +167,22 @@ apps:
 		wantTo   string
 	}{
 		{
-			name:     "both overrides",
+			name:     "example-app",
 			appID:    "example-app",
 			wantFrom: "app-noreply@example.com",
 			wantTo:   "app-ops@example.com",
 		},
 		{
-			name:     "fallback to stack defaults",
-			appID:    "bare-app",
-			wantFrom: "noreply@example.com",
-			wantTo:   "ops@example.com",
-		},
-		{
-			name:     "unknown app uses defaults",
-			appID:    "missing-app",
-			wantFrom: "noreply@example.com",
-			wantTo:   "ops@example.com",
+			name:     "other-app",
+			appID:    "other-app",
+			wantFrom: "other-noreply@example.com",
+			wantTo:   "other-ops@example.com",
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			fake := &fakeSES{}
-			pub := &notify.SES{
-				Client:   fake,
-				From:     "noreply@example.com",
-				To:       "ops@example.com",
-				Registry: reg,
-			}
+			pub := &notify.SES{Client: fake, Registry: reg}
 			err := pub.Publish(context.Background(), &feedback.Report{
 				ID:       "01TEST",
 				AppID:    tc.appID,
@@ -204,38 +202,28 @@ apps:
 	}
 }
 
-func TestSES_Publish_PerAppToOnly(t *testing.T) {
-	reg, err := config.ParseAppsYAML([]byte(`
+func TestSES_Publish_UnknownApp(t *testing.T) {
+	reg := testRegistry(t, `
 apps:
   - id: example-app
     origins: ["https://app.example.com"]
     hosts: ["app.example.com"]
-    notificationEmail: app-ops@example.com
-`))
-	if err != nil {
-		t.Fatal(err)
-	}
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
+`)
 	fake := &fakeSES{}
-	pub := &notify.SES{
-		Client:   fake,
-		From:     "noreply@example.com",
-		To:       "ops@example.com",
-		Registry: reg,
-	}
-	err = pub.Publish(context.Background(), &feedback.Report{
+	pub := &notify.SES{Client: fake, Registry: reg}
+	err := pub.Publish(context.Background(), &feedback.Report{
 		ID:       "01TEST",
-		AppID:    "example-app",
+		AppID:    "missing-app",
 		Category: feedback.CategoryBug,
 		Message:  "Something broke somewhere.",
 	})
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("expected error for unknown app")
 	}
-	if *fake.last.FromEmailAddress != "noreply@example.com" {
-		t.Fatalf("from=%v", fake.last.FromEmailAddress)
-	}
-	if fake.last.Destination.ToAddresses[0] != "app-ops@example.com" {
-		t.Fatalf("to=%v", fake.last.Destination)
+	if fake.last != nil {
+		t.Fatal("SendEmail must not be called")
 	}
 }
 

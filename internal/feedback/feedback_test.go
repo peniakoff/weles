@@ -19,6 +19,8 @@ apps:
     hosts:
       - "app.example.com"
       - "localhost"
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
 `))
 	if err != nil {
 		t.Fatalf("parse registry: %v", err)

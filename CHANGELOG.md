@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project Cursor rules and skills for changelog/roadmap hygiene and security defaults.
 - GitHub Actions CI on push/PR to `main` (`go vet`, race tests, server and Lambda builds, SAM validate) and an OIDC-based deploy workflow.
 - Project icon and GitHub social preview artwork in the README.
-- Optional per-app `notificationEmail` (SES To) and `fromEmail` (SES From) in the apps registry; stack-level `WELES_SES_TO` / `WELES_SES_FROM` remain defaults when omitted.
+- Required per-app `notificationEmail` (SES To) and `fromEmail` (SES From) in the apps registry.
+- Pre-deploy `deploycheck` tool: validate apps YAML and that every `fromEmail` is covered by `SES_IDENTITIES` before SSM publish / SAM deploy.
 
 ### Security
 
@@ -23,15 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prefer `RemoteAddr` for Turnstile `remoteip` and ignore client-controlled `X-Forwarded-For` unless `WELES_TRUST_PROXY_XFF=true`.
 - Grant API Gateway permission to write HTTP API access logs via a CloudWatch Logs resource policy.
 - Align the threat model with the stack: flood cost is limited by API Gateway throttle (Lambda reserved concurrency is not set).
-- Validate SES From/To as bare email addresses at process startup (reject display names and CR/LF).
+- Validate SES From/To as bare email addresses in the apps registry (reject display names and CR/LF).
 
 ### Changed
 
 - Rename process environment variables from `WELLS_*` to `WELES_*`. Deprecated `WELLS_*` names are still read as fallback (a warning is logged; `WELES_*` wins when both are set).
 - Reload the apps allowlist from SSM on a TTL (default 5 minutes when using SSM) so allowlist edits apply without redeploying.
 - Normalize SSM parameter names to always start with `/` in config loading and deploy CI.
-- Support an optional `SesIdentity` SAM parameter (GitHub var `SES_IDENTITY`) so Lambda IAM can target a verified domain identity when From is an address on that domain.
+- Support a required `SesIdentityArns` SAM parameter (built from GitHub var `SES_IDENTITIES`, comma-separated domains/emails — one or many) so Lambda IAM can allow `ses:SendEmail` on multiple SES identities.
 - Scope Lambda `ses:SendEmail` IAM to the configured SES configuration set (`SesConfigurationSet`, default `default-configuration`) instead of every set in the account.
+- Remove stack-level SES From/To (`NotificationEmail` / `FromEmail`, `WELES_SES_FROM` / `WELES_SES_TO`, GitHub `NOTIFICATION_EMAIL` / `FROM_EMAIL`). Operator addresses come only from the apps registry; SES IAM identities come from `SES_IDENTITIES`.
 
 ### Fixed
 

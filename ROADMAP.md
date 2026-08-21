@@ -16,7 +16,7 @@ Agents and contributors must **not** implement items from future versions unless
 - Dual runtime: Lambda + Docker
 - OpenAPI + integration docs
 - CI (vet, race tests, builds, SAM validate) + OIDC deploy
-- Per-app From and notification (To) addresses in the apps registry (optional overrides; stack-level SES From/To remain defaults)
+- Per-app From and notification (To) addresses in the apps registry (required per app; multi-identity SES IAM via `SES_IDENTITIES`)
 
 **Non-goals:** database, dashboard, WAF, custom domain, HMAC, HTML email
 

@@ -17,6 +17,8 @@ apps:
   - id: example-app
     origins: ["https://app.example.com"]
     hosts: ["app.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
 `))
 	if err != nil {
 		t.Fatal(err)
@@ -38,7 +40,7 @@ apps:
 	}
 }
 
-func TestParseAppsYAML_PerAppEmails(t *testing.T) {
+func TestParseAppsYAML_RequiredEmails(t *testing.T) {
 	reg, err := config.ParseAppsYAML([]byte(`
 apps:
   - id: example-app
@@ -49,6 +51,8 @@ apps:
   - id: other-app
     origins: ["https://other.example.com"]
     hosts: ["other.example.com"]
+    notificationEmail: other-ops@example.com
+    fromEmail: other-noreply@example.com
 `))
 	if err != nil {
 		t.Fatal(err)
@@ -67,8 +71,8 @@ apps:
 	if !ok {
 		t.Fatal("expected other-app")
 	}
-	if other.NotificationEmail != "" || other.FromEmail != "" {
-		t.Fatalf("other-app should have empty email overrides: %+v", other)
+	if other.NotificationEmail != "other-ops@example.com" || other.FromEmail != "other-noreply@example.com" {
+		t.Fatalf("other-app emails: %+v", other)
 	}
 }
 
@@ -83,41 +87,67 @@ apps:
   - id: a
     origins: ["https://a.example.com"]
     hosts: ["a.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
   - id: a
     origins: ["https://b.example.com"]
     hosts: ["b.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
 `},
 		{name: "missing origins", yaml: `
 apps:
   - id: a
     origins: []
     hosts: ["a.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
 `},
 		{name: "missing hosts", yaml: `
 apps:
   - id: a
     origins: ["https://a.example.com"]
     hosts: []
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
 `},
 		{name: "missing id", yaml: `
 apps:
   - id: ""
     origins: ["https://a.example.com"]
     hosts: ["a.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
 `},
 		{name: "invalid yaml", yaml: "apps: ["},
+		{name: "missing notificationEmail", yaml: `
+apps:
+  - id: a
+    origins: ["https://a.example.com"]
+    hosts: ["a.example.com"]
+    fromEmail: noreply@example.com
+`},
+		{name: "missing fromEmail", yaml: `
+apps:
+  - id: a
+    origins: ["https://a.example.com"]
+    hosts: ["a.example.com"]
+    notificationEmail: ops@example.com
+`},
 		{name: "bad notificationEmail", yaml: `
 apps:
   - id: a
     origins: ["https://a.example.com"]
     hosts: ["a.example.com"]
     notificationEmail: "Ops <ops@example.com>"
+    fromEmail: noreply@example.com
 `},
 		{name: "bad fromEmail", yaml: `
 apps:
   - id: a
     origins: ["https://a.example.com"]
     hosts: ["a.example.com"]
+    notificationEmail: ops@example.com
     fromEmail: "not-an-email"
 `},
 		{name: "crlf notificationEmail", yaml: `
@@ -126,6 +156,7 @@ apps:
     origins: ["https://a.example.com"]
     hosts: ["a.example.com"]
     notificationEmail: "ops@example.com\ninjected"
+    fromEmail: noreply@example.com
 `},
 	}
 	for _, tc := range tests {
@@ -148,6 +179,10 @@ func TestLoadAppsFile_Example(t *testing.T) {
 	}
 	if !reg.OriginAllowed("https://app.example.com") {
 		t.Fatal("example origin should be allowed")
+	}
+	app, ok := reg.Get("example-app")
+	if !ok || app.NotificationEmail == "" || app.FromEmail == "" {
+		t.Fatalf("example app emails missing: %+v", app)
 	}
 }
 
@@ -221,12 +256,16 @@ apps:
   - id: example-app
     origins: ["https://app.example.com"]
     hosts: ["app.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
 `)
 	yamlB := []byte(`
 apps:
   - id: example-app
     origins: ["https://other.example.com"]
     hosts: ["other.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
 `)
 	useB := atomic.Bool{}
 	load := func() (*config.Registry, error) {
@@ -261,6 +300,8 @@ apps:
   - id: example-app
     origins: ["https://app.example.com"]
     hosts: ["app.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
 `)
 	fail := atomic.Bool{}
 	load := func() (*config.Registry, error) {

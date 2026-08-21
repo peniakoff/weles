@@ -6,6 +6,7 @@ apps:
     hosts:
       - "app.example.com"
       - "localhost"
-    # Optional per-app SES overrides (stack WELES_SES_TO / WELES_SES_FROM remain defaults).
+    # Required SES addresses for this app (fromEmail may use different domains across apps;
+    # list every covering SES identity in GitHub SES_IDENTITIES).
     notificationEmail: ops@example.com
     fromEmail: noreply@example.com

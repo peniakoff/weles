@@ -43,6 +43,35 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Validate apps config and SES identities
+        env:
+          APPS_CONFIG: ${{ secrets.APPS_CONFIG }}
+          SES_IDENTITIES: ${{ vars.SES_IDENTITIES }}
+          SES_IDENTITY: ${{ vars.SES_IDENTITY }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          set -euo pipefail
+          IDENTITIES="${SES_IDENTITIES:-${SES_IDENTITY:-}}"
+          if [[ -z "${IDENTITIES}" ]]; then
+            echo "SES_IDENTITIES (or SES_IDENTITY) GitHub variable is required — comma-separated SES domains/emails for IAM" >&2
+            exit 1
+          fi
+          REGION="${AWS_REGION:?AWS_REGION is required}"
+          ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
+          APPS_FILE="$(mktemp)"
+          printf '%s' "$APPS_CONFIG" > "$APPS_FILE"
+          # Fails if YAML is invalid, emails missing, or fromEmail is outside SES identities.
+          JOINED_ARNS="$(go run ./cmd/deploycheck -apps "$APPS_FILE" -identities "$IDENTITIES" -region "$REGION" -account "$ACCOUNT" -print-arns)"
+          rm -f "$APPS_FILE"
+          {
+            echo "IDENTITIES<<EOF"
+            echo "$IDENTITIES"
+            echo "EOF"
+            echo "JOINED_ARNS<<EOF"
+            echo "$JOINED_ARNS"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
       - name: Publish secrets and allowlist to SSM
         env:
           APPS_CONFIG: ${{ secrets.APPS_CONFIG }}
@@ -79,22 +108,14 @@ jobs:
 
       - name: SAM deploy
         env:
-          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
-          FROM_EMAIL: ${{ vars.FROM_EMAIL }}
-          SES_IDENTITY: ${{ vars.SES_IDENTITY }}
           SES_CONFIGURATION_SET: ${{ vars.SES_CONFIGURATION_SET }}
         run: |
+          set -euo pipefail
           OVERRIDES=(
-            "NotificationEmail=${NOTIFICATION_EMAIL}"
+            "SesIdentityArns=${JOINED_ARNS}"
             "AppsParameterName=${APPS_PARAM}"
             "TurnstileParameterName=${TURNSTILE_PARAM}"
           )
-          if [[ -n "${FROM_EMAIL:-}" ]]; then
-            OVERRIDES+=("FromEmail=${FROM_EMAIL}")
-          fi
-          if [[ -n "${SES_IDENTITY:-}" ]]; then
-            OVERRIDES+=("SesIdentity=${SES_IDENTITY}")
-          fi
           if [[ -n "${SES_CONFIGURATION_SET:-}" ]]; then
             OVERRIDES+=("SesConfigurationSet=${SES_CONFIGURATION_SET}")
           fi

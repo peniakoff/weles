@@ -3,20 +3,12 @@ Transform: AWS::Serverless-2016-10-31
 Description: Weles v1 - feedback intake API (HTTP API + Lambda + SES email)
 
 Parameters:
-  NotificationEmail:
-    Type: String
-    Description: Operator inbox that receives SES notifications (To address).
-  FromEmail:
-    Type: String
-    Default: ""
-    Description: Verified SES From address. Leave empty to use NotificationEmail as From.
-  SesIdentity:
-    Type: String
-    Default: ""
+  SesIdentityArns:
+    Type: CommaDelimitedList
     Description: >
-      SES identity name used in the Lambda IAM policy (email address or verified domain).
-      Leave empty to use the From address. Set to the domain (e.g. example.com) when only
-      the domain identity is verified and From is an address on that domain.
+      Full SES identity ARNs allowed for ses:SendEmail (one or more). Deploy CI builds
+      these from SES_IDENTITIES (comma-separated domains or emails). Example:
+      arn:aws:ses:eu-central-1:123456789012:identity/example.com,arn:aws:ses:eu-central-1:123456789012:identity/other.example.com
   SesConfigurationSet:
     Type: String
     Default: default-configuration
@@ -43,10 +35,6 @@ Parameters:
     Type: Number
     Default: 5
     MinValue: 1
-
-Conditions:
-  HasFromEmail: !Not [!Equals [!Ref FromEmail, ""]]
-  HasSesIdentity: !Not [!Equals [!Ref SesIdentity, ""]]
 
 Globals:
   Function:
@@ -79,8 +67,6 @@ Resources:
           WELES_TURNSTILE_MODE: cloudflare
           WELES_TURNSTILE_SSM: !Ref TurnstileParameterName
           WELES_NOTIFIER: ses
-          WELES_SES_FROM: !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
-          WELES_SES_TO: !Ref NotificationEmail
           WELES_APPS_SSM: !Ref AppsParameterName
           WELES_APPS_RELOAD_SECONDS: "300"
           WELES_LOG_LEVEL: info
@@ -90,13 +76,11 @@ Resources:
             - Effect: Allow
               Action:
                 - ses:SendEmail
+              Resource: !Ref SesIdentityArns
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
               Resource:
-                - !Sub
-                    - arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${ResolvedIdentity}
-                    - ResolvedIdentity: !If
-                        - HasSesIdentity
-                        - !Ref SesIdentity
-                        - !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
                 # Account-level default configuration sets are applied even when
                 # SendEmail omits ConfigurationSetName; IAM must allow that resource.
                 - !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/${SesConfigurationSet}
@@ -198,18 +182,9 @@ Outputs:
   FeedbackURL:
     Description: Full feedback endpoint URL
     Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/v1/feedback
-  NotificationTo:
-    Description: Operator inbox (SES To address)
-    Value: !Ref NotificationEmail
-  NotificationFrom:
-    Description: SES From address (must be a verified SES identity or covered by SesIdentity)
-    Value: !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
-  SesIamIdentity:
-    Description: SES identity name used in the Lambda IAM SendEmail policy
-    Value: !If
-      - HasSesIdentity
-      - !Ref SesIdentity
-      - !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
+  SesIamIdentityArns:
+    Description: SES identity ARNs allowed in the Lambda IAM SendEmail policy
+    Value: !Join [", ", !Ref SesIdentityArns]
   SesIamConfigurationSet:
     Description: SES configuration set name used in the Lambda IAM SendEmail policy
     Value: !Ref SesConfigurationSet
@@ -220,11 +195,7 @@ Outputs:
     Description: SSM parameter name for the Turnstile secret
     Value: !Ref TurnstileParameterName
   VerifySESHint:
-    Description: Before first send, verify the From address or its domain in Amazon SES
+    Description: Before first send, verify each SES identity covering app fromEmail addresses
     Value: !Sub
-      - Verify SES identity for From=${ResolvedFrom} (IAM identity=${ResolvedIdentity}) in ${AWS::Region}; sandbox also requires a verified To
-      - ResolvedFrom: !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
-        ResolvedIdentity: !If
-          - HasSesIdentity
-          - !Ref SesIdentity
-          - !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
+      - Verify SES identities in ${AWS::Region} for ARNs [${Arns}]; each app fromEmail must be covered by one of them; sandbox also requires verified To addresses
+      - Arns: !Join [", ", !Ref SesIdentityArns]

@@ -57,7 +57,7 @@ Field name for the page URL is **`pageUrl`** (camelCase), not `pageURL`.
 
 Unknown JSON fields are **ignored** (not stored or emailed).
 
-When the optional `email` field is present and valid, Weles sets it as the notification **Reply-To**. The operator **From** address stays the verified SES identity (stack `WELES_SES_FROM` / `FromEmail`, or an optional per-app `fromEmail` in the apps registry). The operator inbox (**To**) is stack `WELES_SES_TO` / `NotificationEmail`, or an optional per-app `notificationEmail`.
+When the optional `email` field is present and valid, Weles sets it as the notification **Reply-To**. The operator **From** and **To** addresses come from the apps registry (`fromEmail` / `notificationEmail` for the request `appId`).
 
 ### Success
 
