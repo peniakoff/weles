@@ -89,14 +89,43 @@ Weles reflects `Access-Control-Allow-Origin` only when the request `Origin` is o
 2. On submit, read the token and send it as `turnstileToken`.
 3. Never put the Turnstile **secret** or any AWS credentials in frontend env vars (`VITE_*`, `NEXT_PUBLIC_*`, etc.).
 
+Example (explicit render; replace `YOUR_SITE_KEY` and mount the widget where the form lives):
+
+```html
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+<div id="turnstile-widget"></div>
+<script>
+  let turnstileToken = ''
+  window.onloadTurnstileCallback = () => {
+    turnstile.render('#turnstile-widget', {
+      sitekey: 'YOUR_SITE_KEY',
+      callback: (token) => { turnstileToken = token },
+      'expired-callback': () => { turnstileToken = '' },
+    })
+  }
+</script>
+```
+
+Load the script with `onload=onloadTurnstileCallback` (or call `turnstile.render` after the API is ready). On form submit, send the current `turnstileToken` in the JSON body. Prefer resetting the widget after a failed submit so the user gets a fresh token.
+
+## Privacy and retention (for integrating apps)
+
+This is not legal advice. Publish clear copy in your UI before enabling submit. Align it with how Weles works in v1:
+
+- **No database.** Weles does not store submissions; after validation it sends a plaintext email via Amazon SES and returns `reportId`.
+- **Who receives the mail.** The operator inbox is the app’s `notificationEmail` in the apps registry. The optional submitter `email` is used only as **Reply-To** (never as From).
+- **Logs.** Application logs record `reportId`, `appId`, and category — not `message`, email, or Turnstile tokens. API Gateway access logs (when enabled) are request metadata; the stack retains those log groups for **14 days**.
+- **Inbox retention.** How long the notification stays in the operator mailbox is controlled by that mail provider, not by Weles.
+- **What not to collect.** Do not put passwords, payment data, or unnecessary PII into `message` or `metadata`.
+
 ## Client checklist
 
 1. Deploy Weles and verify the SES From identity (see [deploy.md](deploy.md)).
 2. Register your `appId`, origins, and hosts with the operator.
-3. Set a public env var to the full `POST /v1/feedback` URL (e.g. `VITE_FEEDBACK_API_URL` or `NEXT_PUBLIC_FEEDBACK_API_URL`).
+3. Set a public env var to the full `POST /v1/feedback` URL (e.g. `VITE_FEEDBACK_API_URL` or `NEXT_PUBLIC_FEEDBACK_API_URL`) — typically the stack `FeedbackURL` execute-api URL.
 4. Add Turnstile; mirror server validation on the client for UX only.
 5. Wire pending / success / error / retry UI states.
-6. Enable the submit button only after CORS, Turnstile, and privacy copy are ready.
+6. Enable the submit button only after CORS, Turnstile, and [privacy copy](#privacy-and-retention-for-integrating-apps) are ready.
 7. Do not collect passwords, payment data, or calculator inputs unless you have a documented need.
 
 ## Vue example

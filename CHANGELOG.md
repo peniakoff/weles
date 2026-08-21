@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-21
+
 ### Added
 
 - Feedback intake API (`POST /v1/feedback`) with Cloudflare Turnstile verification, per-app origin and host allowlisting, and Amazon SES plaintext email delivery (verified From/To; optional Reply-To when the submitter provides an email).
@@ -17,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project icon and GitHub social preview artwork in the README.
 - Required per-app `notificationEmail` (SES To) and `fromEmail` (SES From) in the apps registry.
 - Pre-deploy `deploycheck` tool: validate apps YAML and that every `fromEmail` is covered by `SES_IDENTITIES` before SSM publish / SAM deploy.
+- Turnstile widget example and privacy/retention copy guidance for integrating apps.
 
 ### Security
 
@@ -34,9 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support a required `SesIdentityArns` SAM parameter (built from GitHub var `SES_IDENTITIES`, comma-separated domains/emails — one or many) so Lambda IAM can allow `ses:SendEmail` on multiple SES identities.
 - Scope Lambda `ses:SendEmail` IAM to the configured SES configuration set (`SesConfigurationSet`, default `default-configuration`) instead of every set in the account.
 - Remove stack-level SES From/To (`NotificationEmail` / `FromEmail`, `WELES_SES_FROM` / `WELES_SES_TO`, GitHub `NOTIFICATION_EMAIL` / `FROM_EMAIL`). Operator addresses come only from the apps registry; SES IAM identities come from `SES_IDENTITIES`.
+- API Gateway custom hostname (ACM / Route53) is not planned; clients use the execute-api `FeedbackURL` via an env var. SES From on verified domain identities is unchanged.
 
 ### Fixed
 
 - Strip the API Gateway HTTP API stage prefix (for example `/prod`) before ServeMux matching so `GET /healthz` and `POST /v1/feedback` work on the named-stage execute-api URL.
 - Include the publisher error on `publish failed` logs so SES delivery failures are diagnosable without guessing.
 - Allow `ses:SendEmail` on the configured SES configuration set so delivery works when the account has a default configuration set.
+
+[Unreleased]: https://github.com/peniakoff/weles/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/peniakoff/weles/releases/tag/v1.0.0

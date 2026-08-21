@@ -36,7 +36,7 @@ Weles accepts unauthenticated browser traffic on a public HTTPS endpoint. Attack
 1. Keep production allowlists accurate and out of public git.
 2. Verify each app `fromEmail` (and To while in SES sandbox). Set `SES_IDENTITIES` to every verified domain (or email identity) that covers those From addresses (comma-separated). If the account uses a default SES configuration set, set `SesConfigurationSet` to that set's name (stack default `default-configuration`; `*` allows any).
 3. Rotate the Turnstile secret if leaked.
-4. Publish retention/privacy expectations in integrating apps before enabling submit.
+4. Publish retention/privacy expectations in integrating apps before enabling submit (see [integration.md — Privacy and retention](integration.md#privacy-and-retention-for-integrating-apps)).
 5. Review CloudWatch logs for volume anomalies (without expecting message bodies there).
 
 ## Reporting vulnerabilities

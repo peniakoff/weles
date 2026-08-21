@@ -144,7 +144,9 @@ Trust the repository (`repo:OWNER/weles:ref:refs/heads/main` and/or `environment
 
 ## Custom domain
 
-Not included in v1. Later: ACM certificate + API Gateway custom domain (see [ROADMAP.md](../ROADMAP.md)).
+**SES From domains** are supported in v1: verify domain (or email) identities and list them in `SES_IDENTITIES` so each app `fromEmail` can send from your brand domains.
+
+**API Gateway custom hostname** (ACM + Route53 / `feedback.<domain>`) is **not** planned — it adds fixed DNS and certificate cost. Integrators use the stack output `FeedbackURL` (execute-api URL) via a public env var such as `VITE_FEEDBACK_API_URL` or `NEXT_PUBLIC_FEEDBACK_API_URL`. See [ROADMAP.md](../ROADMAP.md).
 
 ## Cost note
 

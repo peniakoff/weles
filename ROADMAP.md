@@ -10,25 +10,26 @@ Agents and contributors must **not** implement items from future versions unless
 
 ## v1.0 — Intake + email
 
-**Status:** `in progress`
+**Status:** `done` (2026-08-21)
 
 - `POST /v1/feedback` with Turnstile, CORS/host allowlists, SES plaintext email
 - Dual runtime: Lambda + Docker
 - OpenAPI + integration docs
 - CI (vet, race tests, builds, SAM validate) + OIDC deploy
-- Per-app From and notification (To) addresses in the apps registry (required per app; multi-identity SES IAM via `SES_IDENTITIES`)
+- Per-app From and notification (To) addresses in the apps registry (required per app; verified **SES domain or email identities** via `SES_IDENTITIES` — this is mail From, not an API hostname)
+- SSM Turnstile secret, apps YAML TTL reload, pre-deploy `deploycheck`, stage-prefix strip, SES configuration-set IAM
 
-**Non-goals:** database, dashboard, WAF, custom domain, HMAC, HTML email
+**Non-goals:** database, dashboard, WAF, API Gateway custom hostname (ACM / Route53), HMAC, HTML email
 
 ---
 
-## v1.1 — Custom domain and client hardening
+## v1.1 — Client hardening
 
-**Status:** `planned`
+**Status:** `done` (2026-08-21)
 
-- Custom domain (`feedback.<domain>`) + ACM
-- Integration docs: Turnstile widget, env-based API URL, enable-submit checklist (generic)
+- Integration docs: Turnstile widget, env-based API URL (execute-api), enable-submit checklist (generic)
 - Privacy/retention copy guidance for integrating apps
+- **Dropped:** API Gateway custom hostname (`feedback.<domain>`) + ACM / Route53 — fixed DNS and custom-domain cost; the execute-api URL is the supported public endpoint (SES From on verified domains remains v1.0)
 
 ---
 
