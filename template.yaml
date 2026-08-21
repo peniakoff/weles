@@ -17,6 +17,13 @@ Parameters:
       SES identity name used in the Lambda IAM policy (email address or verified domain).
       Leave empty to use the From address. Set to the domain (e.g. example.com) when only
       the domain identity is verified and From is an address on that domain.
+  SesConfigurationSet:
+    Type: String
+    Default: default-configuration
+    Description: >
+      SES configuration set name allowed in the Lambda IAM policy. Account default
+      configuration sets are applied even when SendEmail omits ConfigurationSetName.
+      Use * to allow any configuration set in the account.
   StageName:
     Type: String
     Default: prod
@@ -69,15 +76,15 @@ Resources:
       Description: Weles feedback intake
       Environment:
         Variables:
-          WELLS_TURNSTILE_MODE: cloudflare
-          WELLS_TURNSTILE_SSM: !Ref TurnstileParameterName
-          WELLS_NOTIFIER: ses
-          WELLS_SES_FROM: !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
-          WELLS_SES_TO: !Ref NotificationEmail
-          WELLS_APPS_SSM: !Ref AppsParameterName
-          WELLS_APPS_RELOAD_SECONDS: "300"
-          WELLS_LOG_LEVEL: info
-          WELLS_API_STAGE: !Ref StageName
+          WELES_TURNSTILE_MODE: cloudflare
+          WELES_TURNSTILE_SSM: !Ref TurnstileParameterName
+          WELES_NOTIFIER: ses
+          WELES_SES_FROM: !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
+          WELES_SES_TO: !Ref NotificationEmail
+          WELES_APPS_SSM: !Ref AppsParameterName
+          WELES_APPS_RELOAD_SECONDS: "300"
+          WELES_LOG_LEVEL: info
+          WELES_API_STAGE: !Ref StageName
       Policies:
         - Statement:
             - Effect: Allow
@@ -90,6 +97,9 @@ Resources:
                         - HasSesIdentity
                         - !Ref SesIdentity
                         - !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
+                # Account-level default configuration sets are applied even when
+                # SendEmail omits ConfigurationSetName; IAM must allow that resource.
+                - !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/${SesConfigurationSet}
             - Effect: Allow
               Action:
                 - ssm:GetParameter
@@ -200,6 +210,9 @@ Outputs:
       - HasSesIdentity
       - !Ref SesIdentity
       - !If [HasFromEmail, !Ref FromEmail, !Ref NotificationEmail]
+  SesIamConfigurationSet:
+    Description: SES configuration set name used in the Lambda IAM SendEmail policy
+    Value: !Ref SesConfigurationSet
   AppsSSMParameter:
     Description: SSM parameter name for the apps registry YAML
     Value: !Ref AppsParameterName

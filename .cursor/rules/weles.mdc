@@ -10,7 +10,7 @@ alwaysApply: true
 - All code, comments, README, OpenAPI, ROADMAP, CHANGELOG, and `docs/` are **English**.
 - **Never** name real integrating products, production domains, or consumer repositories in public docs, examples, fixtures, or committed config.
 - Use only fictional examples: `example-app`, `app.example.com`, `user@example.com`.
-- Real allowlists belong in deploy-time `WELLS_APPS_YAML` / gitignored `config/apps.yaml` / private notes — not in git.
+- Real allowlists belong in deploy-time `WELES_APPS_YAML` / gitignored `config/apps.yaml` / private notes — not in git.
 
 ## Scope
 

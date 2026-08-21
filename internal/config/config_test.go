@@ -113,10 +113,33 @@ func TestLoadEnv_APIStage(t *testing.T) {
 		{"$default", "$default"},
 	}
 	for _, tc := range tests {
-		t.Setenv("WELLS_API_STAGE", tc.in)
+		t.Setenv("WELES_API_STAGE", tc.in)
+		t.Setenv("WELLS_API_STAGE", "")
 		if got := config.LoadEnv().APIStage; got != tc.want {
-			t.Fatalf("WELLS_API_STAGE=%q → %q want %q", tc.in, got, tc.want)
+			t.Fatalf("WELES_API_STAGE=%q → %q want %q", tc.in, got, tc.want)
 		}
+	}
+}
+
+func TestLoadEnv_LegacyWELLSPrefix(t *testing.T) {
+	t.Setenv("WELES_NOTIFIER", "")
+	t.Setenv("WELLS_NOTIFIER", "ses")
+	t.Setenv("WELES_TURNSTILE_MODE", "")
+	t.Setenv("WELLS_TURNSTILE_MODE", "cloudflare")
+	env := config.LoadEnv()
+	if env.Notifier != "ses" {
+		t.Fatalf("notifier=%q want ses", env.Notifier)
+	}
+	if env.TurnstileMode != "cloudflare" {
+		t.Fatalf("turnstileMode=%q want cloudflare", env.TurnstileMode)
+	}
+}
+
+func TestLoadEnv_WELESWinsOverWELLS(t *testing.T) {
+	t.Setenv("WELES_NOTIFIER", "stdout")
+	t.Setenv("WELLS_NOTIFIER", "ses")
+	if got := config.LoadEnv().Notifier; got != "stdout" {
+		t.Fatalf("notifier=%q want stdout", got)
 	}
 }
 

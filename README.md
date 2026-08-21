@@ -25,7 +25,7 @@ docker compose up --build
 curl -s http://localhost:8080/healthz
 ```
 
-The Compose image defaults to **`WELLS_TURNSTILE_MODE=skip`** and stdout notifications for local development only. Do **not** expose that configuration on the public Internet; set `cloudflare` mode and provide `WELLS_TURNSTILE_SSM` or `WELLS_TURNSTILE_SECRET` for any shared deployment.
+The Compose image defaults to **`WELES_TURNSTILE_MODE=skip`** and stdout notifications for local development only. Do **not** expose that configuration on the public Internet; set `cloudflare` mode and provide `WELES_TURNSTILE_SSM` or `WELES_TURNSTILE_SECRET` for any shared deployment.
 
 Local defaults skip Turnstile verification and print notifications to stdout. See [docs/integration.md](docs/integration.md) for the request contract.
 
@@ -34,7 +34,7 @@ Local defaults skip Turnstile verification and print notifications to stdout. Se
 ```bash
 export PATH="$(go env GOPATH)/bin:$PATH"
 make run
-# WELLS_TURNSTILE_MODE=skip WELLS_NOTIFIER=stdout
+# WELES_TURNSTILE_MODE=skip WELES_NOTIFIER=stdout
 ```
 
 ```bash
@@ -56,24 +56,26 @@ make test
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `WELLS_LISTEN_ADDR` | `:8080` | HTTP listen address (server) |
-| `WELLS_APPS_CONFIG` | `config/apps.example.yaml` | Path to apps allowlist YAML |
-| `WELLS_APPS_YAML` | _(empty)_ | Inline apps YAML (overrides file) |
-| `WELLS_APPS_SSM` | _(empty)_ | SSM parameter name with apps YAML (used on Lambda; leading `/` normalized) |
-| `WELLS_APPS_RELOAD_SECONDS` | `0` (or `300` when SSM is set without override) | How often to reload apps from SSM |
-| `WELLS_TURNSTILE_MODE` | `skip` | `skip` or `cloudflare` — **use `cloudflare` in any public deploy** |
-| `WELLS_TURNSTILE_SECRET` | — | Turnstile secret (local/dev); prefer SSM in production |
-| `WELLS_TURNSTILE_SSM` | — | SSM SecureString parameter name for the Turnstile secret |
-| `WELLS_TRUST_PROXY_XFF` | `false` | If `true`, use first `X-Forwarded-For` hop for Turnstile `remoteip` |
-| `WELLS_NOTIFIER` | `stdout` | `stdout` or `ses` |
-| `WELLS_SES_FROM` | — | Verified SES From address (required when notifier is `ses`; bare email only) |
-| `WELLS_SES_TO` | — | Operator inbox To address (required when notifier is `ses`; bare email only) |
+| `WELES_LISTEN_ADDR` | `:8080` | HTTP listen address (server) |
+| `WELES_APPS_CONFIG` | `config/apps.example.yaml` | Path to apps allowlist YAML |
+| `WELES_APPS_YAML` | _(empty)_ | Inline apps YAML (overrides file) |
+| `WELES_APPS_SSM` | _(empty)_ | SSM parameter name with apps YAML (used on Lambda; leading `/` normalized) |
+| `WELES_APPS_RELOAD_SECONDS` | `0` (or `300` when SSM is set without override) | How often to reload apps from SSM |
+| `WELES_TURNSTILE_MODE` | `skip` | `skip` or `cloudflare` — **use `cloudflare` in any public deploy** |
+| `WELES_TURNSTILE_SECRET` | — | Turnstile secret (local/dev); prefer SSM in production |
+| `WELES_TURNSTILE_SSM` | — | SSM SecureString parameter name for the Turnstile secret |
+| `WELES_TRUST_PROXY_XFF` | `false` | If `true`, use first `X-Forwarded-For` hop for Turnstile `remoteip` |
+| `WELES_NOTIFIER` | `stdout` | `stdout` or `ses` |
+| `WELES_SES_FROM` | — | Verified SES From address (required when notifier is `ses`; bare email only) |
+| `WELES_SES_TO` | — | Operator inbox To address (required when notifier is `ses`; bare email only) |
 | `AWS_REGION` | `eu-central-1` | AWS region |
-| `WELLS_MAX_BODY_BYTES` | `8192` | Max JSON body size |
-| `WELLS_LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
-| `WELLS_API_STAGE` | _(empty)_ | API Gateway HTTP API stage name; Lambda strips `/{stage}` from the request path (SAM sets this from `StageName`) |
+| `WELES_MAX_BODY_BYTES` | `8192` | Max JSON body size |
+| `WELES_LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
+| `WELES_API_STAGE` | _(empty)_ | API Gateway HTTP API stage name; Lambda strips `/{stage}` from the request path (SAM sets this from `StageName`) |
 
-Production app allowlists (real origins/hosts) must **not** be committed. Use `config/apps.example.yaml` as the public template and publish real values to SSM (`WELLS_APPS_SSM`) at deploy time.
+Deprecated `WELLS_*` names are still read as fallback (a warning is logged). `WELES_*` wins when both are set.
+
+Production app allowlists (real origins/hosts) must **not** be committed. Use `config/apps.example.yaml` as the public template and publish real values to SSM (`WELES_APPS_SSM`) at deploy time.
 
 ## License
 

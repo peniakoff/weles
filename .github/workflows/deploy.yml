@@ -82,6 +82,7 @@ jobs:
           NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
           FROM_EMAIL: ${{ vars.FROM_EMAIL }}
           SES_IDENTITY: ${{ vars.SES_IDENTITY }}
+          SES_CONFIGURATION_SET: ${{ vars.SES_CONFIGURATION_SET }}
         run: |
           OVERRIDES=(
             "NotificationEmail=${NOTIFICATION_EMAIL}"
@@ -93,6 +94,9 @@ jobs:
           fi
           if [[ -n "${SES_IDENTITY:-}" ]]; then
             OVERRIDES+=("SesIdentity=${SES_IDENTITY}")
+          fi
+          if [[ -n "${SES_CONFIGURATION_SET:-}" ]]; then
+            OVERRIDES+=("SesConfigurationSet=${SES_CONFIGURATION_SET}")
           fi
           sam deploy \
             --no-confirm-changeset \
