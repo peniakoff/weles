@@ -119,7 +119,7 @@ func (s *Server) handleFeedback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.Publisher.Publish(r.Context(), report); err != nil {
-		s.log().Error("publish failed", "reportId", report.ID, "appId", report.AppID)
+		s.log().Error("publish failed", "reportId", report.ID, "appId", report.AppID, "err", err)
 		writeError(w, http.StatusServiceUnavailable, "unavailable")
 		return
 	}
