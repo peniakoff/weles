@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project Cursor rules and skills for changelog/roadmap hygiene and security defaults.
 - GitHub Actions CI on push/PR to `main` (`go vet`, race tests, server and Lambda builds, SAM validate) and an OIDC-based deploy workflow.
 - Project icon and GitHub social preview artwork in the README.
+- Optional per-app `notificationEmail` (SES To) and `fromEmail` (SES From) in the apps registry; stack-level `WELES_SES_TO` / `WELES_SES_FROM` remain defaults when omitted.
 
 ### Security
 

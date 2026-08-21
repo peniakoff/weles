@@ -15,6 +15,16 @@ description: Maintains ROADMAP.md and CHANGELOG.md (Keep a Changelog, SemVer) fo
 
 File: [CHANGELOG.md](../../../CHANGELOG.md)
 
+### Mandatory Unreleased entry
+
+Every change visible to an operator or integrating app (feature, fix, security hardening, breaking config/API, material deploy behaviour) **must** get an entry under `## [Unreleased]` **in the same change** — never “we’ll add the changelog later”.
+
+Skip only pure internal refactors with no behaviour change, private-notes typo fixes, or ROADMAP/skill-only edits that do not affect users.
+
+Before treating the task as done: open `CHANGELOG.md` and confirm `[Unreleased]` reflects the work.
+
+### Format
+
 - Keep `## [Unreleased]` at the top.
 - Categories only: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
 - English full sentences; explain user-facing impact, not a file dump.

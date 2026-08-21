@@ -42,7 +42,7 @@ func Build(ctx context.Context) (*Dependencies, error) {
 		return nil, err
 	}
 
-	publisher, err := buildPublisher(ctx, env, logger)
+	publisher, err := buildPublisher(ctx, env, logger, registry)
 	if err != nil {
 		return nil, err
 	}
@@ -135,12 +135,12 @@ func buildVerifier(ctx context.Context, env config.Env) (turnstile.Verifier, err
 	}
 }
 
-func buildPublisher(ctx context.Context, env config.Env, logger *slog.Logger) (notify.Publisher, error) {
+func buildPublisher(ctx context.Context, env config.Env, logger *slog.Logger, registry config.AppRegistry) (notify.Publisher, error) {
 	switch env.Notifier {
 	case "stdout", "log":
 		return notify.Stdout{Logger: logger}, nil
 	case "ses":
-		return notify.NewSES(ctx, env.AWSRegion, env.SESFrom, env.SESTo)
+		return notify.NewSES(ctx, env.AWSRegion, env.SESFrom, env.SESTo, registry)
 	default:
 		return nil, fmt.Errorf("unknown WELES_NOTIFIER %q", env.Notifier)
 	}

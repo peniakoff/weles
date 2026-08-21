@@ -11,15 +11,16 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 
+	"github.com/peniakoff/weles/internal/config"
 	"github.com/peniakoff/weles/internal/feedback"
 	"github.com/peniakoff/weles/internal/notify"
 )
 
 func TestNewSES_RequiresFromAndTo(t *testing.T) {
-	if _, err := notify.NewSES(context.Background(), "eu-central-1", "", "ops@example.com"); err == nil {
+	if _, err := notify.NewSES(context.Background(), "eu-central-1", "", "ops@example.com", nil); err == nil {
 		t.Fatal("expected error for empty from")
 	}
-	if _, err := notify.NewSES(context.Background(), "eu-central-1", "noreply@example.com", ""); err == nil {
+	if _, err := notify.NewSES(context.Background(), "eu-central-1", "noreply@example.com", "", nil); err == nil {
 		t.Fatal("expected error for empty to")
 	}
 }
@@ -37,7 +38,7 @@ func TestNewSES_RejectsInvalidAddresses(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := notify.NewSES(context.Background(), "eu-central-1", tc.from, tc.to); err == nil {
+			if _, err := notify.NewSES(context.Background(), "eu-central-1", tc.from, tc.to, nil); err == nil {
 				t.Fatal("expected error")
 			}
 		})
@@ -131,6 +132,110 @@ func TestSES_Publish_Error(t *testing.T) {
 	err := pub.Publish(context.Background(), &feedback.Report{ID: "1", AppID: "example-app", Category: "bug", Message: "x"})
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestSES_Publish_PerAppEmailOverrides(t *testing.T) {
+	reg, err := config.ParseAppsYAML([]byte(`
+apps:
+  - id: example-app
+    origins: ["https://app.example.com"]
+    hosts: ["app.example.com"]
+    notificationEmail: app-ops@example.com
+    fromEmail: app-noreply@example.com
+  - id: bare-app
+    origins: ["https://bare.example.com"]
+    hosts: ["bare.example.com"]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name     string
+		appID    string
+		wantFrom string
+		wantTo   string
+	}{
+		{
+			name:     "both overrides",
+			appID:    "example-app",
+			wantFrom: "app-noreply@example.com",
+			wantTo:   "app-ops@example.com",
+		},
+		{
+			name:     "fallback to stack defaults",
+			appID:    "bare-app",
+			wantFrom: "noreply@example.com",
+			wantTo:   "ops@example.com",
+		},
+		{
+			name:     "unknown app uses defaults",
+			appID:    "missing-app",
+			wantFrom: "noreply@example.com",
+			wantTo:   "ops@example.com",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := &fakeSES{}
+			pub := &notify.SES{
+				Client:   fake,
+				From:     "noreply@example.com",
+				To:       "ops@example.com",
+				Registry: reg,
+			}
+			err := pub.Publish(context.Background(), &feedback.Report{
+				ID:       "01TEST",
+				AppID:    tc.appID,
+				Category: feedback.CategoryBug,
+				Message:  "Something broke somewhere.",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if fake.last.FromEmailAddress == nil || *fake.last.FromEmailAddress != tc.wantFrom {
+				t.Fatalf("from=%v want %q", fake.last.FromEmailAddress, tc.wantFrom)
+			}
+			if fake.last.Destination == nil || len(fake.last.Destination.ToAddresses) != 1 || fake.last.Destination.ToAddresses[0] != tc.wantTo {
+				t.Fatalf("to=%v want %q", fake.last.Destination, tc.wantTo)
+			}
+		})
+	}
+}
+
+func TestSES_Publish_PerAppToOnly(t *testing.T) {
+	reg, err := config.ParseAppsYAML([]byte(`
+apps:
+  - id: example-app
+    origins: ["https://app.example.com"]
+    hosts: ["app.example.com"]
+    notificationEmail: app-ops@example.com
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &fakeSES{}
+	pub := &notify.SES{
+		Client:   fake,
+		From:     "noreply@example.com",
+		To:       "ops@example.com",
+		Registry: reg,
+	}
+	err = pub.Publish(context.Background(), &feedback.Report{
+		ID:       "01TEST",
+		AppID:    "example-app",
+		Category: feedback.CategoryBug,
+		Message:  "Something broke somewhere.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *fake.last.FromEmailAddress != "noreply@example.com" {
+		t.Fatalf("from=%v", fake.last.FromEmailAddress)
+	}
+	if fake.last.Destination.ToAddresses[0] != "app-ops@example.com" {
+		t.Fatalf("to=%v", fake.last.Destination)
 	}
 }
 

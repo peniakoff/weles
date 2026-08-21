@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"net/mail"
 	"os"
 	"strconv"
 	"strings"
@@ -15,9 +16,11 @@ import (
 
 // App describes one integrating application and its browser allowlists.
 type App struct {
-	ID      string   `yaml:"id"`
-	Origins []string `yaml:"origins"`
-	Hosts   []string `yaml:"hosts"`
+	ID                string   `yaml:"id"`
+	Origins           []string `yaml:"origins"`
+	Hosts             []string `yaml:"hosts"`
+	NotificationEmail string   `yaml:"notificationEmail,omitempty"` // optional SES To override
+	FromEmail         string   `yaml:"fromEmail,omitempty"`         // optional SES From override
 }
 
 // AppsFile is the on-disk shape of the application registry.
@@ -92,10 +95,43 @@ func ParseAppsYAML(data []byte) (*Registry, error) {
 		if len(origins) == 0 || len(hosts) == 0 {
 			return nil, fmt.Errorf("apps config: app %q has empty allowlists after trim", id)
 		}
-		byID[id] = App{ID: id, Origins: origins, Hosts: hosts}
+
+		notificationEmail, err := optionalBareEmail(fmt.Sprintf("apps config: app %q notificationEmail", id), app.NotificationEmail)
+		if err != nil {
+			return nil, err
+		}
+		fromEmail, err := optionalBareEmail(fmt.Sprintf("apps config: app %q fromEmail", id), app.FromEmail)
+		if err != nil {
+			return nil, err
+		}
+
+		byID[id] = App{
+			ID:                id,
+			Origins:           origins,
+			Hosts:             hosts,
+			NotificationEmail: notificationEmail,
+			FromEmail:         fromEmail,
+		}
 	}
 
 	return &Registry{byID: byID}, nil
+}
+
+// optionalBareEmail accepts empty (meaning unset) or a bare email address
+// (no display name, no CR/LF). Same contract as SES From/To validation.
+func optionalBareEmail(label, raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	if strings.ContainsAny(raw, "\r\n") {
+		return "", fmt.Errorf("%s is invalid", label)
+	}
+	addr, err := mail.ParseAddress(raw)
+	if err != nil || addr.Address != raw {
+		return "", fmt.Errorf("%s is invalid", label)
+	}
+	return addr.Address, nil
 }
 
 // Get returns an app by ID.

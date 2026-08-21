@@ -24,9 +24,11 @@ description: Weles v1 security defaults for the feedback API. Use when changing 
 
 - Production notifier: Amazon SES v2 plaintext `SendEmail` (`WELES_NOTIFIER=ses`); local/Docker default: `stdout`.
 - Plaintext email bodies only (no HTML).
-- Operator From/To from config; optional submitter email is Reply-To only (never From).
+- Operator From/To come from stack env (`WELES_SES_FROM` / `WELES_SES_TO`) with optional per-app overrides in the apps registry (`fromEmail` / `notificationEmail`).
+- Optional submitter email is Reply-To only (never From).
 - Subject/body must not introduce injection vectors from user input beyond what validation already strips.
 - IAM: `ses:SendEmail` on the configured SES identity (email address or verified domain via `SesIdentity`) and on `configuration-set/${SesConfigurationSet}` (default `default-configuration`; account default sets are authorized even when the API omits `ConfigurationSetName`).
+- Per-app `fromEmail` values must stay under that single deploy-time SES identity (typically a verified domain); IAM does not reload with the apps YAML.
 
 ## Logging
 
