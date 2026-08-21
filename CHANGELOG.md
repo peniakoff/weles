@@ -32,3 +32,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Strip the API Gateway HTTP API stage prefix (for example `/prod`) before ServeMux matching so `GET /healthz` and `POST /v1/feedback` work on the named-stage execute-api URL.
+- Include the publisher error on `publish failed` logs so SES delivery failures are diagnosable without guessing.
