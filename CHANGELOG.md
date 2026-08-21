@@ -19,17 +19,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - Load the Turnstile secret from an SSM SecureString at startup instead of placing it in the Lambda environment.
-- Prefer `RemoteAddr` for Turnstile `remoteip` and ignore client-controlled `X-Forwarded-For` unless `WELLS_TRUST_PROXY_XFF=true`.
+- Prefer `RemoteAddr` for Turnstile `remoteip` and ignore client-controlled `X-Forwarded-For` unless `WELES_TRUST_PROXY_XFF=true`.
 - Grant API Gateway permission to write HTTP API access logs via a CloudWatch Logs resource policy.
+- Align the threat model with the stack: flood cost is limited by API Gateway throttle (Lambda reserved concurrency is not set).
 - Validate SES From/To as bare email addresses at process startup (reject display names and CR/LF).
 
 ### Changed
 
+- Rename process environment variables from `WELLS_*` to `WELES_*`. Deprecated `WELLS_*` names are still read as fallback (a warning is logged; `WELES_*` wins when both are set).
 - Reload the apps allowlist from SSM on a TTL (default 5 minutes when using SSM) so allowlist edits apply without redeploying.
 - Normalize SSM parameter names to always start with `/` in config loading and deploy CI.
 - Support an optional `SesIdentity` SAM parameter (GitHub var `SES_IDENTITY`) so Lambda IAM can target a verified domain identity when From is an address on that domain.
+- Scope Lambda `ses:SendEmail` IAM to the configured SES configuration set (`SesConfigurationSet`, default `default-configuration`) instead of every set in the account.
 
 ### Fixed
 
 - Strip the API Gateway HTTP API stage prefix (for example `/prod`) before ServeMux matching so `GET /healthz` and `POST /v1/feedback` work on the named-stage execute-api URL.
 - Include the publisher error on `publish failed` logs so SES delivery failures are diagnosable without guessing.
+- Allow `ses:SendEmail` on the configured SES configuration set so delivery works when the account has a default configuration set.

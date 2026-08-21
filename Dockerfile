@@ -16,10 +16,10 @@ COPY --from=build /out/server /app/server
 COPY config/apps.example.yaml /app/config/apps.yaml
 USER weles
 # WARNING: skip + stdout are for local/dev only. Public deploys must use
-# WELLS_TURNSTILE_MODE=cloudflare and WELLS_TURNSTILE_SSM (or SECRET) + SES.
-ENV WELLS_APPS_CONFIG=/app/config/apps.yaml \
-	WELLS_LISTEN_ADDR=:8080 \
-	WELLS_TURNSTILE_MODE=skip \
-	WELLS_NOTIFIER=stdout
+# WELES_TURNSTILE_MODE=cloudflare and WELES_TURNSTILE_SSM (or SECRET) + SES.
+ENV WELES_APPS_CONFIG=/app/config/apps.yaml \
+	WELES_LISTEN_ADDR=:8080 \
+	WELES_TURNSTILE_MODE=skip \
+	WELES_NOTIFIER=stdout
 EXPOSE 8080
 ENTRYPOINT ["/app/server"]

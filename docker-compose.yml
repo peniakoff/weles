@@ -4,8 +4,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      WELLS_LISTEN_ADDR: ":8080"
-      WELLS_APPS_CONFIG: /app/config/apps.yaml
-      WELLS_TURNSTILE_MODE: skip
-      WELLS_NOTIFIER: stdout
-      WELLS_LOG_LEVEL: info
+      WELES_LISTEN_ADDR: ":8080"
+      WELES_APPS_CONFIG: /app/config/apps.yaml
+      WELES_TURNSTILE_MODE: skip
+      WELES_NOTIFIER: stdout
+      WELES_LOG_LEVEL: info

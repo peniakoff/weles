@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -262,25 +263,47 @@ type Env struct {
 }
 
 // LoadEnv reads configuration from environment variables with safe defaults for local use.
+// WELES_* names are canonical. Deprecated WELLS_* names are accepted as fallback
+// (a warning is logged; the value is never logged).
 func LoadEnv() Env {
 	return Env{
-		ListenAddr:      getenv("WELLS_LISTEN_ADDR", ":8080"),
-		AppsConfigPath:  getenv("WELLS_APPS_CONFIG", "config/apps.example.yaml"),
-		AppsYAML:        os.Getenv("WELLS_APPS_YAML"),
-		AppsSSMParam:    NormalizeSSMName(os.Getenv("WELLS_APPS_SSM")),
-		AppsReloadEvery: getenvDuration("WELLS_APPS_RELOAD_SECONDS", 0),
-		TurnstileMode:   strings.ToLower(getenv("WELLS_TURNSTILE_MODE", "skip")),
-		TurnstileSecret: os.Getenv("WELLS_TURNSTILE_SECRET"),
-		TurnstileSSM:    NormalizeSSMName(os.Getenv("WELLS_TURNSTILE_SSM")),
-		Notifier:        strings.ToLower(getenv("WELLS_NOTIFIER", "stdout")),
-		SESFrom:         strings.TrimSpace(os.Getenv("WELLS_SES_FROM")),
-		SESTo:           strings.TrimSpace(os.Getenv("WELLS_SES_TO")),
+		ListenAddr:      getenvPrefixed("LISTEN_ADDR", ":8080"),
+		AppsConfigPath:  getenvPrefixed("APPS_CONFIG", "config/apps.example.yaml"),
+		AppsYAML:        prefixedEnv("APPS_YAML"),
+		AppsSSMParam:    NormalizeSSMName(prefixedEnv("APPS_SSM")),
+		AppsReloadEvery: getenvDurationPrefixed("APPS_RELOAD_SECONDS", 0),
+		TurnstileMode:   strings.ToLower(getenvPrefixed("TURNSTILE_MODE", "skip")),
+		TurnstileSecret: prefixedEnv("TURNSTILE_SECRET"),
+		TurnstileSSM:    NormalizeSSMName(prefixedEnv("TURNSTILE_SSM")),
+		Notifier:        strings.ToLower(getenvPrefixed("NOTIFIER", "stdout")),
+		SESFrom:         prefixedEnv("SES_FROM"),
+		SESTo:           prefixedEnv("SES_TO"),
 		AWSRegion:       getenv("AWS_REGION", "eu-central-1"),
-		MaxBodyBytes:    getenvInt64("WELLS_MAX_BODY_BYTES", 8*1024),
-		LogLevel:        strings.ToLower(getenv("WELLS_LOG_LEVEL", "info")),
-		TrustProxyXFF:   getenvBool("WELLS_TRUST_PROXY_XFF", false),
-		APIStage:        strings.Trim(strings.TrimSpace(os.Getenv("WELLS_API_STAGE")), "/"),
+		MaxBodyBytes:    getenvInt64Prefixed("MAX_BODY_BYTES", 8*1024),
+		LogLevel:        strings.ToLower(getenvPrefixed("LOG_LEVEL", "info")),
+		TrustProxyXFF:   getenvBoolPrefixed("TRUST_PROXY_XFF", false),
+		APIStage:        strings.Trim(prefixedEnv("API_STAGE"), "/"),
 	}
+}
+
+// prefixedEnv returns WELES_<suffix>, or deprecated WELLS_<suffix> if unset.
+func prefixedEnv(suffix string) string {
+	if v := strings.TrimSpace(os.Getenv("WELES_" + suffix)); v != "" {
+		return v
+	}
+	legacy := "WELLS_" + suffix
+	if v := strings.TrimSpace(os.Getenv(legacy)); v != "" {
+		slog.Warn("deprecated environment variable; use the WELES_ prefix", "legacy", legacy)
+		return v
+	}
+	return ""
+}
+
+func getenvPrefixed(suffix, fallback string) string {
+	if v := prefixedEnv(suffix); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func getenv(key, fallback string) string {
@@ -290,8 +313,8 @@ func getenv(key, fallback string) string {
 	return fallback
 }
 
-func getenvInt64(key string, fallback int64) int64 {
-	v := strings.TrimSpace(os.Getenv(key))
+func getenvInt64Prefixed(suffix string, fallback int64) int64 {
+	v := prefixedEnv(suffix)
 	if v == "" {
 		return fallback
 	}
@@ -302,8 +325,8 @@ func getenvInt64(key string, fallback int64) int64 {
 	return n
 }
 
-func getenvDuration(key string, fallback time.Duration) time.Duration {
-	v := strings.TrimSpace(os.Getenv(key))
+func getenvDurationPrefixed(suffix string, fallback time.Duration) time.Duration {
+	v := prefixedEnv(suffix)
 	if v == "" {
 		return fallback
 	}
@@ -314,8 +337,8 @@ func getenvDuration(key string, fallback time.Duration) time.Duration {
 	return time.Duration(n) * time.Second
 }
 
-func getenvBool(key string, fallback bool) bool {
-	v := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+func getenvBoolPrefixed(suffix string, fallback bool) bool {
+	v := strings.ToLower(prefixedEnv(suffix))
 	if v == "" {
 		return fallback
 	}

@@ -20,9 +20,10 @@ Stack: **AWS SAM** → API Gateway **HTTP API** → Lambda **`provided.al2023` a
 | `NotificationEmail` | Operator inbox (SES **To** address) |
 | `FromEmail` | Optional verified SES **From** address; empty means use `NotificationEmail` as From |
 | `SesIdentity` | Optional SES identity name for the Lambda IAM policy (email **or** verified domain). Empty means use the From address. When only a **domain** identity is verified, set this to the domain (e.g. `example.com`) while `FromEmail` is an address on that domain |
+| `SesConfigurationSet` | SES configuration set name allowed for `ses:SendEmail` (default `default-configuration`). Set to `*` to allow any set. Account default sets apply even when the API omits `ConfigurationSetName` |
 | `AppsParameterName` | SSM parameter for apps YAML (default `/weles/prod/apps`, **must start with `/`**) |
 | `TurnstileParameterName` | SSM SecureString for Turnstile secret (default `/weles/prod/turnstile-secret`, **must start with `/`**) |
-| `StageName` | Default `prod`. Public URLs include this segment (`…/prod/healthz`). Lambda strips it before the Go mux via `WELLS_API_STAGE`. Use `$default` only if you want URLs without a stage prefix. |
+| `StageName` | Default `prod`. Public URLs include this segment (`…/prod/healthz`). Lambda strips it before the Go mux via `WELES_API_STAGE`. Use `$default` only if you want URLs without a stage prefix. |
 | `ThrottleRate` / `ThrottleBurst` | Defaults `1` / `5` |
 
 **Do not commit** production allowlists or secrets. Publish them to SSM before (or via) deploy:
@@ -51,19 +52,22 @@ sam deploy \
     "NotificationEmail=ops@example.com" \
     "FromEmail=noreply@example.com" \
     "SesIdentity=example.com" \
+    "SesConfigurationSet=default-configuration" \
     "AppsParameterName=/weles/prod/apps" \
     "TurnstileParameterName=/weles/prod/turnstile-secret"
 ```
 
-The Turnstile secret is **not** injected as a Lambda environment variable. The function reads it from SSM at startup (`WELLS_TURNSTILE_SSM`).
+The Turnstile secret is **not** injected as a Lambda environment variable. The function reads it from SSM at startup (`WELES_TURNSTILE_SSM`).
 
 The stack does **not** create an `AWS::SES::EmailIdentity`. Verify From (and, while the account is in the SES sandbox, also To) in the Amazon SES console or CLI before the first successful send. Leaving `FromEmail` empty uses `NotificationEmail` for both From and To — the easy sandbox path when that single address is verified.
 
-**Domain vs email identity:** the Lambda IAM policy allows `ses:SendEmail` only on `arn:…:identity/${SesIdentity}` (or the From address when `SesIdentity` is empty). If you verified a **domain** identity and send as `noreply@example.com`, set `SesIdentity=example.com`. If you verified the **email address** itself, leave `SesIdentity` empty.
+**Domain vs email identity:** the Lambda IAM policy allows `ses:SendEmail` on `arn:…:identity/${SesIdentity}` (or the From address when `SesIdentity` is empty) **and** on `arn:…:configuration-set/${SesConfigurationSet}` (default `default-configuration`). If you verified a **domain** identity and send as `noreply@example.com`, set `SesIdentity=example.com`. If you verified the **email address** itself, leave `SesIdentity` empty.
+
+If the SES account has a **default configuration set**, SES v2 `SendEmail` authorizes that set even when the API call does not pass `ConfigurationSetName`. Without matching configuration-set IAM, delivery fails with `AccessDeniedException`. Set `SesConfigurationSet` to that set's name, or `*` to allow any set.
 
 ### Allowlist reload
 
-When `WELLS_APPS_SSM` is set, Weles reloads the apps registry about every **5 minutes** by default (`WELLS_APPS_RELOAD_SECONDS=300` in the SAM template). Edits to the SSM apps parameter apply without a full redeploy once the TTL elapses (or the Lambda instance is replaced). Set `WELLS_APPS_RELOAD_SECONDS=0` to load once per cold start only.
+When `WELES_APPS_SSM` is set, Weles reloads the apps registry about every **5 minutes** by default (`WELES_APPS_RELOAD_SECONDS=300` in the SAM template). Edits to the SSM apps parameter apply without a full redeploy once the TTL elapses (or the Lambda instance is replaced). Set `WELES_APPS_RELOAD_SECONDS=0` to load once per cold start only.
 
 ### Migrating from an SNS-based stack
 
@@ -99,6 +103,7 @@ Deploy workflow [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml
 - `TURNSTILE_PARAMETER_NAME` (optional; default `/weles/prod/turnstile-secret`)
 - `FROM_EMAIL` (optional; verified SES From; when unset, `NotificationEmail` is used as From)
 - `SES_IDENTITY` (optional; SES identity name for IAM — email or domain; when unset, uses From)
+- `SES_CONFIGURATION_SET` (optional; SES configuration set name for IAM; when unset, `default-configuration`)
 
 ### GitHub secrets / environment secrets
 

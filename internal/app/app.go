@@ -131,7 +131,7 @@ func buildVerifier(ctx context.Context, env config.Env) (turnstile.Verifier, err
 		}
 		return turnstile.NewCloudflare(secret)
 	default:
-		return nil, fmt.Errorf("unknown WELLS_TURNSTILE_MODE %q", env.TurnstileMode)
+		return nil, fmt.Errorf("unknown WELES_TURNSTILE_MODE %q", env.TurnstileMode)
 	}
 }
 
@@ -142,7 +142,7 @@ func buildPublisher(ctx context.Context, env config.Env, logger *slog.Logger) (n
 	case "ses":
 		return notify.NewSES(ctx, env.AWSRegion, env.SESFrom, env.SESTo)
 	default:
-		return nil, fmt.Errorf("unknown WELLS_NOTIFIER %q", env.Notifier)
+		return nil, fmt.Errorf("unknown WELES_NOTIFIER %q", env.Notifier)
 	}
 }
 
