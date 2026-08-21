@@ -17,8 +17,8 @@ Stack: **AWS SAM** → API Gateway **HTTP API** → Lambda **`provided.al2023` a
 
 | Parameter | Description |
 |-----------|-------------|
-| `NotificationEmail` | Operator inbox (SES **To** address) |
-| `FromEmail` | Optional verified SES **From** address; empty means use `NotificationEmail` as From |
+| `NotificationEmail` | Default operator inbox (SES **To** address). Overridable per app via `notificationEmail` in the apps registry |
+| `FromEmail` | Optional verified SES **From** address; empty means use `NotificationEmail` as From. Overridable per app via `fromEmail` in the apps registry |
 | `SesIdentity` | Optional SES identity name for the Lambda IAM policy (email **or** verified domain). Empty means use the From address. When only a **domain** identity is verified, set this to the domain (e.g. `example.com`) while `FromEmail` is an address on that domain |
 | `SesConfigurationSet` | SES configuration set name allowed for `ses:SendEmail` (default `default-configuration`). Set to `*` to allow any set. Account default sets apply even when the API omits `ConfigurationSetName` |
 | `AppsParameterName` | SSM parameter for apps YAML (default `/weles/prod/apps`, **must start with `/`**) |
@@ -42,7 +42,12 @@ aws ssm put-parameter \
   --overwrite
 ```
 
-`config/apps.yaml` is gitignored. Use `config/apps.example.yaml` as the public template.
+`config/apps.yaml` is gitignored. Use `config/apps.example.yaml` as the public template. Optional per-app fields:
+
+- `notificationEmail` — SES **To** for that app (falls back to stack `NotificationEmail` / `WELES_SES_TO`)
+- `fromEmail` — SES **From** for that app (falls back to stack `FromEmail` / `WELES_SES_FROM`, then to the resolved To)
+
+All per-app `fromEmail` values must be covered by the single deploy-time SES identity (`SesIdentity` or From). Changing From to another domain requires verifying that identity and updating `SesIdentity` (redeploy); the apps YAML reload alone does not widen IAM.
 
 ```bash
 sam build

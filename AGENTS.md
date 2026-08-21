@@ -21,3 +21,4 @@ Read these before changing behaviour or docs:
 - English in the public repository
 - No real consumer product names or production domains in committed docs/examples/config
 - Do not implement future ROADMAP items unless the user asks
+- Every user-facing change must update `CHANGELOG.md` under `[Unreleased]` in the same change (see weles-release-docs)

@@ -6,3 +6,6 @@ apps:
     hosts:
       - "app.example.com"
       - "localhost"
+    # Optional per-app SES overrides (stack WELES_SES_TO / WELES_SES_FROM remain defaults).
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com

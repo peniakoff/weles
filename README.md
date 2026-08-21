@@ -14,6 +14,7 @@ Named after **Veles** (Weles), the Slavic god of the underworld, waters, and cat
 - Cloudflare Turnstile verification
 - Per-app origin and page-host allowlists
 - Amazon SES plaintext email delivery (or stdout for local/Docker), with optional Reply-To from the submitter email
+- Optional per-app SES From/To overrides in the apps registry (`fromEmail` / `notificationEmail`)
 - Dual runtime: AWS Lambda (`provided.al2023` arm64) and Docker/`net/http`
 - CI on push/PR to `main` (vet, race tests, server + Lambda builds, SAM validate)
 
@@ -66,8 +67,8 @@ make test
 | `WELES_TURNSTILE_SSM` | — | SSM SecureString parameter name for the Turnstile secret |
 | `WELES_TRUST_PROXY_XFF` | `false` | If `true`, use first `X-Forwarded-For` hop for Turnstile `remoteip` |
 | `WELES_NOTIFIER` | `stdout` | `stdout` or `ses` |
-| `WELES_SES_FROM` | — | Verified SES From address (required when notifier is `ses`; bare email only) |
-| `WELES_SES_TO` | — | Operator inbox To address (required when notifier is `ses`; bare email only) |
+| `WELES_SES_FROM` | — | Verified SES From address (required when notifier is `ses`; bare email only). Overridable per app via `fromEmail` in the apps registry |
+| `WELES_SES_TO` | — | Operator inbox To address (required when notifier is `ses`; bare email only). Overridable per app via `notificationEmail` in the apps registry |
 | `AWS_REGION` | `eu-central-1` | AWS region |
 | `WELES_MAX_BODY_BYTES` | `8192` | Max JSON body size |
 | `WELES_LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
@@ -75,7 +76,7 @@ make test
 
 Deprecated `WELLS_*` names are still read as fallback (a warning is logged). `WELES_*` wins when both are set.
 
-Production app allowlists (real origins/hosts) must **not** be committed. Use `config/apps.example.yaml` as the public template and publish real values to SSM (`WELES_APPS_SSM`) at deploy time.
+Production app allowlists (real origins/hosts) must **not** be committed. Use `config/apps.example.yaml` as the public template and publish real values to SSM (`WELES_APPS_SSM`) at deploy time. Optional `notificationEmail` / `fromEmail` fields override stack-level SES To/From for that app; omitted fields keep the stack defaults. Per-app `fromEmail` addresses must stay under the deploy-time SES identity (usually a verified domain via `SesIdentity`).
 
 ## License
 

@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
+	"github.com/peniakoff/weles/internal/config"
 	"github.com/peniakoff/weles/internal/feedback"
 )
 
@@ -41,9 +42,10 @@ func (s Stdout) Publish(_ context.Context, report *feedback.Report) error {
 
 // SES sends a plaintext email via Amazon SES v2.
 type SES struct {
-	Client SESAPI
-	From   string
-	To     string
+	Client   SESAPI
+	From     string // stack-level default From
+	To       string // stack-level default To
+	Registry config.AppRegistry
 }
 
 // SESAPI is the subset of the SES v2 client used by Weles (for tests).
@@ -52,7 +54,7 @@ type SESAPI interface {
 }
 
 // NewSES builds an SES publisher using the default AWS credential chain.
-func NewSES(ctx context.Context, region, from, to string) (*SES, error) {
+func NewSES(ctx context.Context, region, from, to string, registry config.AppRegistry) (*SES, error) {
 	from, err := requireEmailAddress("SES from", from)
 	if err != nil {
 		return nil, err
@@ -66,9 +68,10 @@ func NewSES(ctx context.Context, region, from, to string) (*SES, error) {
 		return nil, fmt.Errorf("aws config: %w", err)
 	}
 	return &SES{
-		Client: sesv2.NewFromConfig(cfg),
-		From:   from,
-		To:     to,
+		Client:   sesv2.NewFromConfig(cfg),
+		From:     from,
+		To:       to,
+		Registry: registry,
 	}, nil
 }
 
@@ -87,14 +90,37 @@ func requireEmailAddress(label, raw string) (string, error) {
 	return addr.Address, nil
 }
 
+// resolveAddresses returns From and To for a report.
+// To: app.notificationEmail → stack To.
+// From: app.fromEmail → stack From → resolved To.
+func (s *SES) resolveAddresses(report *feedback.Report) (from, to string) {
+	to = s.To
+	from = s.From
+	if s.Registry != nil && report != nil {
+		if app, ok := s.Registry.Get(report.AppID); ok {
+			if app.NotificationEmail != "" {
+				to = app.NotificationEmail
+			}
+			if app.FromEmail != "" {
+				from = app.FromEmail
+			}
+		}
+	}
+	if from == "" {
+		from = to
+	}
+	return from, to
+}
+
 // Publish implements Publisher.
 func (s *SES) Publish(ctx context.Context, report *feedback.Report) error {
+	from, to := s.resolveAddresses(report)
 	subject := formatSubject(report)
 	body := feedback.FormatPlainEmail(report)
 	input := &sesv2.SendEmailInput{
-		FromEmailAddress: aws.String(s.From),
+		FromEmailAddress: aws.String(from),
 		Destination: &types.Destination{
-			ToAddresses: []string{s.To},
+			ToAddresses: []string{to},
 		},
 		Content: &types.EmailContent{
 			Simple: &types.Message{

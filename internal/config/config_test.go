@@ -38,6 +38,40 @@ apps:
 	}
 }
 
+func TestParseAppsYAML_PerAppEmails(t *testing.T) {
+	reg, err := config.ParseAppsYAML([]byte(`
+apps:
+  - id: example-app
+    origins: ["https://app.example.com"]
+    hosts: ["app.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
+  - id: other-app
+    origins: ["https://other.example.com"]
+    hosts: ["other.example.com"]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	app, ok := reg.Get("example-app")
+	if !ok {
+		t.Fatal("expected example-app")
+	}
+	if app.NotificationEmail != "ops@example.com" {
+		t.Fatalf("notificationEmail=%q", app.NotificationEmail)
+	}
+	if app.FromEmail != "noreply@example.com" {
+		t.Fatalf("fromEmail=%q", app.FromEmail)
+	}
+	other, ok := reg.Get("other-app")
+	if !ok {
+		t.Fatal("expected other-app")
+	}
+	if other.NotificationEmail != "" || other.FromEmail != "" {
+		t.Fatalf("other-app should have empty email overrides: %+v", other)
+	}
+}
+
 func TestParseAppsYAML_TableErrors(t *testing.T) {
 	tests := []struct {
 		name string
@@ -72,6 +106,27 @@ apps:
     hosts: ["a.example.com"]
 `},
 		{name: "invalid yaml", yaml: "apps: ["},
+		{name: "bad notificationEmail", yaml: `
+apps:
+  - id: a
+    origins: ["https://a.example.com"]
+    hosts: ["a.example.com"]
+    notificationEmail: "Ops <ops@example.com>"
+`},
+		{name: "bad fromEmail", yaml: `
+apps:
+  - id: a
+    origins: ["https://a.example.com"]
+    hosts: ["a.example.com"]
+    fromEmail: "not-an-email"
+`},
+		{name: "crlf notificationEmail", yaml: `
+apps:
+  - id: a
+    origins: ["https://a.example.com"]
+    hosts: ["a.example.com"]
+    notificationEmail: "ops@example.com\ninjected"
+`},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

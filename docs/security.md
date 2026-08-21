@@ -10,7 +10,7 @@ Weles accepts unauthenticated browser traffic on a public HTTPS endpoint. Attack
 - **API Gateway throttling** limits flood cost.
 - **Strict validation** of category, lengths, email (no CR/LF), and URL shape.
 - **Plaintext email only** (no HTML) to reduce markup injection into inboxes.
-- **SES From** is operator-configured and verified; optional submitter email is used only as **Reply-To** after validation (never as From).
+- **SES From** is operator-configured (stack default and optional per-app `fromEmail`) and verified; optional submitter email is used only as **Reply-To** after validation (never as From).
 - **No outbound fetch of `pageUrl`** — the URL is never retrieved by the server (no SSRF).
 - **No database in v1** — injection surface is limited to notification content.
 
@@ -34,7 +34,7 @@ Weles accepts unauthenticated browser traffic on a public HTTPS endpoint. Attack
 ## Operator responsibilities
 
 1. Keep production allowlists accurate and out of public git.
-2. Verify the SES From identity (and To while in SES sandbox). If only a domain identity is verified, set `SesIdentity` to that domain. If the account uses a default SES configuration set, set `SesConfigurationSet` to that set's name (stack default `default-configuration`; `*` allows any).
+2. Verify the SES From identity (and To while in SES sandbox). If only a domain identity is verified, set `SesIdentity` to that domain. Per-app `fromEmail` overrides must stay under that identity. If the account uses a default SES configuration set, set `SesConfigurationSet` to that set's name (stack default `default-configuration`; `*` allows any).
 3. Rotate the Turnstile secret if leaked.
 4. Publish retention/privacy expectations in integrating apps before enabling submit.
 5. Review CloudWatch logs for volume anomalies (without expecting message bodies there).

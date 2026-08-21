@@ -16,6 +16,7 @@ Agents and contributors must **not** implement items from future versions unless
 - Dual runtime: Lambda + Docker
 - OpenAPI + integration docs
 - CI (vet, race tests, builds, SAM validate) + OIDC deploy
+- Per-app From and notification (To) addresses in the apps registry (optional overrides; stack-level SES From/To remain defaults)
 
 **Non-goals:** database, dashboard, WAF, custom domain, HMAC, HTML email
 
@@ -35,7 +36,6 @@ Agents and contributors must **not** implement items from future versions unless
 
 **Status:** `planned`
 
-- Per-app destination email in the apps registry
 - Optional notifier retry / `503` with `Retry-After`
 - Optional HTML (multipart) email alongside plaintext
 

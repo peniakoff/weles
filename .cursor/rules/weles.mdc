@@ -16,6 +16,7 @@ alwaysApply: true
 
 - Do not implement features outside the current ROADMAP version unless the user explicitly requests it.
 - When starting a planned item, update `ROADMAP.md` status and add a `CHANGELOG.md` `[Unreleased]` entry.
+- Every user-facing change (feature, fix, security, breaking config/API, material deploy behaviour) must update `CHANGELOG.md` under `[Unreleased]` in the same change. Skip only pure internal refactors or private-notes/skill-only edits with no user impact.
 
 ## Code
 
