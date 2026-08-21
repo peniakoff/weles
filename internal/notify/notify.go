@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/mail"
 	"os"
 	"strings"
 
@@ -41,10 +40,9 @@ func (s Stdout) Publish(_ context.Context, report *feedback.Report) error {
 }
 
 // SES sends a plaintext email via Amazon SES v2.
+// From and To are taken from the apps registry (fromEmail / notificationEmail).
 type SES struct {
 	Client   SESAPI
-	From     string // stack-level default From
-	To       string // stack-level default To
 	Registry config.AppRegistry
 }
 
@@ -54,14 +52,9 @@ type SESAPI interface {
 }
 
 // NewSES builds an SES publisher using the default AWS credential chain.
-func NewSES(ctx context.Context, region, from, to string, registry config.AppRegistry) (*SES, error) {
-	from, err := requireEmailAddress("SES from", from)
-	if err != nil {
-		return nil, err
-	}
-	to, err = requireEmailAddress("SES to", to)
-	if err != nil {
-		return nil, err
+func NewSES(ctx context.Context, region string, registry config.AppRegistry) (*SES, error) {
+	if registry == nil {
+		return nil, fmt.Errorf("apps registry is required for SES notifier")
 	}
 	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
 	if err != nil {
@@ -69,52 +62,33 @@ func NewSES(ctx context.Context, region, from, to string, registry config.AppReg
 	}
 	return &SES{
 		Client:   sesv2.NewFromConfig(cfg),
-		From:     from,
-		To:       to,
 		Registry: registry,
 	}, nil
 }
 
-func requireEmailAddress(label, raw string) (string, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return "", fmt.Errorf("%s address is required", label)
+// resolveAddresses returns From and To for a report from the apps registry.
+func (s *SES) resolveAddresses(report *feedback.Report) (from, to string, err error) {
+	if report == nil {
+		return "", "", fmt.Errorf("report is required")
 	}
-	if strings.ContainsAny(raw, "\r\n") {
-		return "", fmt.Errorf("%s address is invalid", label)
+	app, ok := s.Registry.Get(report.AppID)
+	if !ok {
+		return "", "", fmt.Errorf("unknown app %q", report.AppID)
 	}
-	addr, err := mail.ParseAddress(raw)
-	if err != nil || addr.Address != raw {
-		return "", fmt.Errorf("%s address is invalid", label)
+	from = strings.TrimSpace(app.FromEmail)
+	to = strings.TrimSpace(app.NotificationEmail)
+	if from == "" || to == "" {
+		return "", "", fmt.Errorf("app %q missing fromEmail or notificationEmail", report.AppID)
 	}
-	return addr.Address, nil
-}
-
-// resolveAddresses returns From and To for a report.
-// To: app.notificationEmail → stack To.
-// From: app.fromEmail → stack From → resolved To.
-func (s *SES) resolveAddresses(report *feedback.Report) (from, to string) {
-	to = s.To
-	from = s.From
-	if s.Registry != nil && report != nil {
-		if app, ok := s.Registry.Get(report.AppID); ok {
-			if app.NotificationEmail != "" {
-				to = app.NotificationEmail
-			}
-			if app.FromEmail != "" {
-				from = app.FromEmail
-			}
-		}
-	}
-	if from == "" {
-		from = to
-	}
-	return from, to
+	return from, to, nil
 }
 
 // Publish implements Publisher.
 func (s *SES) Publish(ctx context.Context, report *feedback.Report) error {
-	from, to := s.resolveAddresses(report)
+	from, to, err := s.resolveAddresses(report)
+	if err != nil {
+		return err
+	}
 	subject := formatSubject(report)
 	body := feedback.FormatPlainEmail(report)
 	input := &sesv2.SendEmailInput{
@@ -140,7 +114,7 @@ func (s *SES) Publish(ctx context.Context, report *feedback.Report) error {
 	if replyTo := strings.TrimSpace(report.Email); replyTo != "" {
 		input.ReplyToAddresses = []string{replyTo}
 	}
-	_, err := s.Client.SendEmail(ctx, input)
+	_, err = s.Client.SendEmail(ctx, input)
 	if err != nil {
 		return fmt.Errorf("ses send email: %w", err)
 	}

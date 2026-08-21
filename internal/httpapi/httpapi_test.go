@@ -46,6 +46,8 @@ apps:
   - id: example-app
     origins: ["https://app.example.com"]
     hosts: ["app.example.com"]
+    notificationEmail: ops@example.com
+    fromEmail: noreply@example.com
 `))
 	if err != nil {
 		t.Fatal(err)

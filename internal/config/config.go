@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/mail"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,8 +20,8 @@ type App struct {
 	ID                string   `yaml:"id"`
 	Origins           []string `yaml:"origins"`
 	Hosts             []string `yaml:"hosts"`
-	NotificationEmail string   `yaml:"notificationEmail,omitempty"` // optional SES To override
-	FromEmail         string   `yaml:"fromEmail,omitempty"`         // optional SES From override
+	NotificationEmail string   `yaml:"notificationEmail"` // SES To (operator inbox)
+	FromEmail         string   `yaml:"fromEmail"`         // SES From (verified identity / domain)
 }
 
 // AppsFile is the on-disk shape of the application registry.
@@ -96,11 +97,11 @@ func ParseAppsYAML(data []byte) (*Registry, error) {
 			return nil, fmt.Errorf("apps config: app %q has empty allowlists after trim", id)
 		}
 
-		notificationEmail, err := optionalBareEmail(fmt.Sprintf("apps config: app %q notificationEmail", id), app.NotificationEmail)
+		notificationEmail, err := requireBareEmail(fmt.Sprintf("apps config: app %q notificationEmail", id), app.NotificationEmail)
 		if err != nil {
 			return nil, err
 		}
-		fromEmail, err := optionalBareEmail(fmt.Sprintf("apps config: app %q fromEmail", id), app.FromEmail)
+		fromEmail, err := requireBareEmail(fmt.Sprintf("apps config: app %q fromEmail", id), app.FromEmail)
 		if err != nil {
 			return nil, err
 		}
@@ -117,12 +118,11 @@ func ParseAppsYAML(data []byte) (*Registry, error) {
 	return &Registry{byID: byID}, nil
 }
 
-// optionalBareEmail accepts empty (meaning unset) or a bare email address
-// (no display name, no CR/LF). Same contract as SES From/To validation.
-func optionalBareEmail(label, raw string) (string, error) {
+// requireBareEmail requires a bare email address (no display name, no CR/LF).
+func requireBareEmail(label, raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", nil
+		return "", fmt.Errorf("%s is required", label)
 	}
 	if strings.ContainsAny(raw, "\r\n") {
 		return "", fmt.Errorf("%s is invalid", label)
@@ -138,6 +138,20 @@ func optionalBareEmail(label, raw string) (string, error) {
 func (r *Registry) Get(id string) (App, bool) {
 	app, ok := r.byID[strings.TrimSpace(id)]
 	return app, ok
+}
+
+// All returns registered apps sorted by ID.
+func (r *Registry) All() []App {
+	ids := make([]string, 0, len(r.byID))
+	for id := range r.byID {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	out := make([]App, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, r.byID[id])
+	}
+	return out
 }
 
 // AllowsOrigin reports whether origin is allowed for the given app.
@@ -289,8 +303,6 @@ type Env struct {
 	TurnstileSecret  string // local/dev; prefer TurnstileSSM in production
 	TurnstileSSM     string // SSM SecureString parameter name
 	Notifier         string // "ses" | "stdout"
-	SESFrom          string
-	SESTo            string
 	AWSRegion        string
 	MaxBodyBytes     int64
 	LogLevel         string
@@ -312,8 +324,6 @@ func LoadEnv() Env {
 		TurnstileSecret: prefixedEnv("TURNSTILE_SECRET"),
 		TurnstileSSM:    NormalizeSSMName(prefixedEnv("TURNSTILE_SSM")),
 		Notifier:        strings.ToLower(getenvPrefixed("NOTIFIER", "stdout")),
-		SESFrom:         prefixedEnv("SES_FROM"),
-		SESTo:           prefixedEnv("SES_TO"),
 		AWSRegion:       getenv("AWS_REGION", "eu-central-1"),
 		MaxBodyBytes:    getenvInt64Prefixed("MAX_BODY_BYTES", 8*1024),
 		LogLevel:        strings.ToLower(getenvPrefixed("LOG_LEVEL", "info")),

@@ -5,7 +5,7 @@ GO ?= go
 # Lambda output binary name required by provided.al2023
 LAMBDA_BIN := bootstrap
 
-.PHONY: tidy build test test-race lint docker-build lambda-build sam-build sam-validate run clean build-FeedbackFunction
+.PHONY: tidy build test test-race lint docker-build lambda-build sam-build sam-validate run clean build-FeedbackFunction deploycheck
 
 tidy:
 	$(GO) mod tidy
@@ -18,6 +18,11 @@ run:
 
 test:
 	$(GO) test ./... -count=1
+
+deploycheck:
+	@test -n "$(APPS)" || (echo "usage: make deploycheck APPS=config/apps.yaml IDENTITIES=example.com [REGION=… ACCOUNT=… PRINT_ARNS=1]" >&2; exit 1)
+	@test -n "$(IDENTITIES)" || (echo "usage: make deploycheck APPS=config/apps.yaml IDENTITIES=example.com [REGION=… ACCOUNT=… PRINT_ARNS=1]" >&2; exit 1)
+	$(GO) run ./cmd/deploycheck -apps "$(APPS)" -identities "$(IDENTITIES)" $(if $(REGION),-region $(REGION),) $(if $(ACCOUNT),-account $(ACCOUNT),) $(if $(PRINT_ARNS),-print-arns,)
 
 test-race:
 	$(GO) test ./... -count=1 -race

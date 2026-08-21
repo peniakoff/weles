@@ -24,11 +24,12 @@ description: Weles v1 security defaults for the feedback API. Use when changing 
 
 - Production notifier: Amazon SES v2 plaintext `SendEmail` (`WELES_NOTIFIER=ses`); local/Docker default: `stdout`.
 - Plaintext email bodies only (no HTML).
-- Operator From/To come from stack env (`WELES_SES_FROM` / `WELES_SES_TO`) with optional per-app overrides in the apps registry (`fromEmail` / `notificationEmail`).
+- Operator From/To come from the apps registry (`fromEmail` / `notificationEmail`; required per app).
 - Optional submitter email is Reply-To only (never From).
 - Subject/body must not introduce injection vectors from user input beyond what validation already strips.
-- IAM: `ses:SendEmail` on the configured SES identity (email address or verified domain via `SesIdentity`) and on `configuration-set/${SesConfigurationSet}` (default `default-configuration`; account default sets are authorized even when the API omits `ConfigurationSetName`).
-- Per-app `fromEmail` values must stay under that single deploy-time SES identity (typically a verified domain); IAM does not reload with the apps YAML.
+- IAM: `ses:SendEmail` on each configured SES identity ARN (`SesIdentityArns` / GitHub `SES_IDENTITIES` — one or more domains or emails) and on `configuration-set/${SesConfigurationSet}` (default `default-configuration`; account default sets are authorized even when the API omits `ConfigurationSetName`).
+- Per-app `fromEmail` may use different domains; every covering SES identity must be listed at deploy time. Deploy CI runs `deploycheck` so uncovered From addresses fail before SSM/SAM.
+- IAM does not reload with the apps YAML; adding a domain still requires updating `SES_IDENTITIES` and redeploying.
 
 ## Logging
 

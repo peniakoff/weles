@@ -140,7 +140,7 @@ func buildPublisher(ctx context.Context, env config.Env, logger *slog.Logger, re
 	case "stdout", "log":
 		return notify.Stdout{Logger: logger}, nil
 	case "ses":
-		return notify.NewSES(ctx, env.AWSRegion, env.SESFrom, env.SESTo, registry)
+		return notify.NewSES(ctx, env.AWSRegion, registry)
 	default:
 		return nil, fmt.Errorf("unknown WELES_NOTIFIER %q", env.Notifier)
 	}

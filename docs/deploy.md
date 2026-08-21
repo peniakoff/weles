@@ -11,15 +11,13 @@ Stack: **AWS SAM** → API Gateway **HTTP API** → Lambda **`provided.al2023` a
 - Go 1.24+ (for `sam build` Makefile target)
 - Cloudflare Turnstile site + secret
 - Operator email inbox you control
-- A **verified SES identity** for the From address (email click verification or domain DKIM) in the deploy region
+- A **verified SES identity** (prefer a domain) covering every app `fromEmail` in the deploy region
 
 ## Parameters
 
 | Parameter | Description |
 |-----------|-------------|
-| `NotificationEmail` | Default operator inbox (SES **To** address). Overridable per app via `notificationEmail` in the apps registry |
-| `FromEmail` | Optional verified SES **From** address; empty means use `NotificationEmail` as From. Overridable per app via `fromEmail` in the apps registry |
-| `SesIdentity` | Optional SES identity name for the Lambda IAM policy (email **or** verified domain). Empty means use the From address. When only a **domain** identity is verified, set this to the domain (e.g. `example.com`) while `FromEmail` is an address on that domain |
+| `SesIdentityArns` | **Required.** One or more full SES identity ARNs for Lambda IAM (`ses:SendEmail`). Deploy CI builds this from GitHub var `SES_IDENTITIES` (comma-separated domains or emails). Example: two domains → two ARNs |
 | `SesConfigurationSet` | SES configuration set name allowed for `ses:SendEmail` (default `default-configuration`). Set to `*` to allow any set. Account default sets apply even when the API omits `ConfigurationSetName` |
 | `AppsParameterName` | SSM parameter for apps YAML (default `/weles/prod/apps`, **must start with `/`**) |
 | `TurnstileParameterName` | SSM SecureString for Turnstile secret (default `/weles/prod/turnstile-secret`, **must start with `/`**) |
@@ -42,21 +40,22 @@ aws ssm put-parameter \
   --overwrite
 ```
 
-`config/apps.yaml` is gitignored. Use `config/apps.example.yaml` as the public template. Optional per-app fields:
+`config/apps.yaml` is gitignored. Use `config/apps.example.yaml` as the public template. **Required** per-app fields:
 
-- `notificationEmail` — SES **To** for that app (falls back to stack `NotificationEmail` / `WELES_SES_TO`)
-- `fromEmail` — SES **From** for that app (falls back to stack `FromEmail` / `WELES_SES_FROM`, then to the resolved To)
+- `notificationEmail` — SES **To** (operator inbox) for that app
+- `fromEmail` — SES **From** for that app (must be covered by one of the identities in `SesIdentityArns` / `SES_IDENTITIES`)
 
-All per-app `fromEmail` values must be covered by the single deploy-time SES identity (`SesIdentity` or From). Changing From to another domain requires verifying that identity and updating `SesIdentity` (redeploy); the apps YAML reload alone does not widen IAM.
+Apps may use **different domains** for `fromEmail`. List every verified domain (or email identity) in `SES_IDENTITIES`. Adding a new domain requires verifying it in SES and redeploying with an updated `SES_IDENTITIES` list; the apps YAML reload alone does not widen IAM.
 
 ```bash
+# Example: allow From on two verified domains (deploy CI expands names to ARNs).
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+REGION=eu-central-1
 sam build
 sam deploy \
   --guided \
   --parameter-overrides \
-    "NotificationEmail=ops@example.com" \
-    "FromEmail=noreply@example.com" \
-    "SesIdentity=example.com" \
+    "SesIdentityArns=arn:aws:ses:${REGION}:${ACCOUNT}:identity/example.com,arn:aws:ses:${REGION}:${ACCOUNT}:identity/other.example.com" \
     "SesConfigurationSet=default-configuration" \
     "AppsParameterName=/weles/prod/apps" \
     "TurnstileParameterName=/weles/prod/turnstile-secret"
@@ -64,9 +63,9 @@ sam deploy \
 
 The Turnstile secret is **not** injected as a Lambda environment variable. The function reads it from SSM at startup (`WELES_TURNSTILE_SSM`).
 
-The stack does **not** create an `AWS::SES::EmailIdentity`. Verify From (and, while the account is in the SES sandbox, also To) in the Amazon SES console or CLI before the first successful send. Leaving `FromEmail` empty uses `NotificationEmail` for both From and To — the easy sandbox path when that single address is verified.
+The stack does **not** create an `AWS::SES::EmailIdentity`. Verify each app `fromEmail` (or its domain listed in `SES_IDENTITIES`) in the Amazon SES console or CLI before the first successful send. While the account is in the SES sandbox, also verify each `notificationEmail` (To).
 
-**Domain vs email identity:** the Lambda IAM policy allows `ses:SendEmail` on `arn:…:identity/${SesIdentity}` (or the From address when `SesIdentity` is empty) **and** on `arn:…:configuration-set/${SesConfigurationSet}` (default `default-configuration`). If you verified a **domain** identity and send as `noreply@example.com`, set `SesIdentity=example.com`. If you verified the **email address** itself, leave `SesIdentity` empty.
+**Domain vs email identity:** the Lambda IAM policy allows `ses:SendEmail` on each ARN in `SesIdentityArns` **and** on `arn:…:configuration-set/${SesConfigurationSet}` (default `default-configuration`). For a domain identity, set `SES_IDENTITIES=example.com` (or include that ARN) and use `fromEmail` addresses on that domain. For a single email identity, list that address. Multiple apps on different domains → comma-separated list, e.g. `example.com,other.example.com`.
 
 If the SES account has a **default configuration set**, SES v2 `SendEmail` authorizes that set even when the API call does not pass `ConfigurationSetName`. Without matching configuration-set IAM, delivery fails with `AccessDeniedException`. Set `SesConfigurationSet` to that set's name, or `*` to allow any set.
 
@@ -74,17 +73,41 @@ If the SES account has a **default configuration set**, SES v2 `SendEmail` autho
 
 When `WELES_APPS_SSM` is set, Weles reloads the apps registry about every **5 minutes** by default (`WELES_APPS_RELOAD_SECONDS=300` in the SAM template). Edits to the SSM apps parameter apply without a full redeploy once the TTL elapses (or the Lambda instance is replaced). Set `WELES_APPS_RELOAD_SECONDS=0` to load once per cold start only.
 
+### Migrating from stack-level NotificationEmail / FromEmail
+
+**Do this before merging/deploying this revision**, or Lambda will fail to start / SES will return AccessDenied:
+
+1. Update GitHub secret `APPS_CONFIG`: every app must include `notificationEmail` and `fromEmail` (see `config/apps.example.yaml`).
+2. Set GitHub var `SES_IDENTITIES` to a comma-separated list of every verified SES domain or email identity that covers those `fromEmail` values (example: `example.com,other.example.com`). `SES_IDENTITY` still works as a single-value alias.
+3. Remove unused `NOTIFICATION_EMAIL` secret and `FROM_EMAIL` var (and any local `samconfig` overrides for `NotificationEmail` / `FromEmail` / `SesIdentity`).
+4. Deploy CI runs `go run ./cmd/deploycheck` **before** writing SSM: invalid apps YAML, missing emails, or `fromEmail` outside `SES_IDENTITIES` fails the job (no partial outage from a bad allowlist push).
+5. After deploy: smoke-test `GET /healthz` and one real feedback submit per integrating app.
+
+Older stacks passed `NotificationEmail` and optional `FromEmail` as SAM parameters. Those parameters are removed in favor of the apps registry + `SesIdentityArns` (built from `SES_IDENTITIES`).
+
+Local check (same logic as CI):
+
+```bash
+go run ./cmd/deploycheck \
+  -apps config/apps.yaml \
+  -identities "example.com,other.example.com" \
+  -region eu-central-1 \
+  -account 123456789012 \
+  -print-arns
+```
+
+
 ### Migrating from an SNS-based stack
 
-The first deploy of this SES revision **deletes** the former SNS topic and email subscription from the CloudFormation stack. Confirm the SES From identity before relying on mail delivery.
+The first deploy of the SES revision **deletes** the former SNS topic and email subscription from the CloudFormation stack. Confirm the SES From identity before relying on mail delivery.
 
 ## After first deploy
 
-1. Verify the SES From identity (and To if still in sandbox).
+1. Verify the SES identity for every app `fromEmail` (and To if still in sandbox).
 2. Note stack outputs `FeedbackURL` and `ApiEndpoint`.
 3. Point integrating apps at `FeedbackURL`.
 4. Smoke-test liveness: `GET {ApiEndpoint}/healthz` should return JSON `{"status":"ok"}`.
-5. Smoke-test from an allowlisted origin with a real Turnstile token.
+5. Smoke-test from an allowlisted origin with a real Turnstile token (once per app / From domain if you use multiple identities).
 
 ## Local / Docker
 
@@ -106,19 +129,18 @@ Deploy workflow [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml
 - `AWS_ROLE_TO_ASSUME` (IAM role ARN trusting `token.actions.githubusercontent.com`)
 - `APPS_PARAMETER_NAME` (optional; default `/weles/prod/apps`)
 - `TURNSTILE_PARAMETER_NAME` (optional; default `/weles/prod/turnstile-secret`)
-- `FROM_EMAIL` (optional; verified SES From; when unset, `NotificationEmail` is used as From)
-- `SES_IDENTITY` (optional; SES identity name for IAM — email or domain; when unset, uses From)
+- `SES_IDENTITIES` (**required** unless `SES_IDENTITY` is set; comma-separated SES domains or emails for IAM — may list multiple domains)
+- `SES_IDENTITY` (optional alias for a single identity when `SES_IDENTITIES` is unset)
 - `SES_CONFIGURATION_SET` (optional; SES configuration set name for IAM; when unset, `default-configuration`)
 
 ### GitHub secrets / environment secrets
 
-- `NOTIFICATION_EMAIL`
 - `TURNSTILE_SECRET`
-- `APPS_CONFIG` (full apps YAML string)
+- `APPS_CONFIG` (full apps YAML string, including required `notificationEmail` / `fromEmail` per app)
 
 ### IAM role
 
-Trust the repository (`repo:OWNER/weles:ref:refs/heads/main` and/or `environment:production`). Attach permissions for CloudFormation, SAM, Lambda, API Gateway, SES (`ses:SendEmail` on the `SesIdentity` or From identity), IAM pass-role, CloudWatch Logs (including `logs:PutResourcePolicy` / `logs:DeleteResourcePolicy` if needed for access-log policies), S3 for SAM artifacts, and `ssm:PutParameter` / `ssm:GetParameter` on `/weles/*`.
+Trust the repository (`repo:OWNER/weles:ref:refs/heads/main` and/or `environment:production`). Attach permissions for CloudFormation, SAM, Lambda, API Gateway, SES (`ses:SendEmail` on each identity in `SesIdentityArns`), IAM pass-role, CloudWatch Logs (including `logs:PutResourcePolicy` / `logs:DeleteResourcePolicy` if needed for access-log policies), S3 for SAM artifacts, and `ssm:PutParameter` / `ssm:GetParameter` on `/weles/*`.
 
 ## Custom domain
 
