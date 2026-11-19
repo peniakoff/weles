@@ -46,7 +46,11 @@ jobs:
         run: make lambda-build
 
       - name: Install SAM CLI
-        run: pip install --disable-pip-version-check aws-sam-cli
+        uses: aws-actions/setup-sam@v3
+        with:
+          # Native installer is digest-verified, unlike an unpinned pip install; bump deliberately.
+          version: 1.171.0
+          use-installer: true
 
       - name: Validate SAM template
         run: make sam-validate

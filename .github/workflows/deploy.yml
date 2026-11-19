@@ -35,7 +35,11 @@ jobs:
           cache: true
 
       - name: Install SAM CLI
-        run: pip install aws-sam-cli
+        uses: aws-actions/setup-sam@v3
+        with:
+          # Native installer is digest-verified, unlike an unpinned pip install; bump deliberately.
+          version: 1.171.0
+          use-installer: true
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v6
