@@ -16,7 +16,7 @@ Named after **Veles** (Weles), the Slavic god of the underworld, waters, and cat
 - Amazon SES plaintext email delivery (or stdout for local/Docker), with optional Reply-To from the submitter email
 - Per-app SES From/To in the apps registry (`fromEmail` / `notificationEmail`)
 - Dual runtime: AWS Lambda (`provided.al2023` arm64) and Docker/`net/http`
-- CI on push/PR to `main` (vet, race tests, server + Lambda builds, SAM validate)
+- CI on push/PR to `main` (vet, golangci-lint, race tests, server + Lambda builds, SAM validate)
 
 ## Quick start (Docker)
 

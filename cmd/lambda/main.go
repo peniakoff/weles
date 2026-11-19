@@ -1,3 +1,4 @@
+// Command lambda runs the feedback API as an AWS Lambda behind API Gateway HTTP API.
 package main
 
 import (

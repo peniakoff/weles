@@ -71,7 +71,7 @@ func (c *Cloudflare) Verify(ctx context.Context, token, remoteIP string) error {
 	if err != nil {
 		return fmt.Errorf("turnstile verify: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	if err != nil {

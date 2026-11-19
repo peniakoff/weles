@@ -1,3 +1,4 @@
+// Command server runs the feedback API as a standalone net/http server.
 package main
 
 import (

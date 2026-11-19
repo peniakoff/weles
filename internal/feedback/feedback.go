@@ -31,6 +31,7 @@ const (
 // Category is the feedback type selected by the user.
 type Category string
 
+// Allowed feedback categories.
 const (
 	CategoryBug        Category = "bug"
 	CategorySuggestion Category = "suggestion"
