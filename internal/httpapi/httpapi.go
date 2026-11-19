@@ -80,7 +80,6 @@ func (s *Server) handleFeedback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, s.maxBody())
-	defer r.Body.Close()
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
