@@ -40,13 +40,13 @@ const (
 
 // Submission is the JSON body accepted by POST /v1/feedback.
 type Submission struct {
-	AppID          string            `json:"appId"`
-	Category       Category          `json:"category"`
-	Message        string            `json:"message"`
-	Email          string            `json:"email,omitempty"`
-	Context        Context           `json:"context"`
-	TurnstileToken string            `json:"turnstileToken"`
-	SubmittedAt    string            `json:"submittedAt,omitempty"`
+	AppID          string   `json:"appId"`
+	Category       Category `json:"category"`
+	Message        string   `json:"message"`
+	Email          string   `json:"email,omitempty"`
+	Context        Context  `json:"context"`
+	TurnstileToken string   `json:"turnstileToken"`
+	SubmittedAt    string   `json:"submittedAt,omitempty"`
 }
 
 // Context carries page metadata; Metadata is opaque client labels.
@@ -58,16 +58,16 @@ type Context struct {
 
 // Report is a validated submission ready for notification.
 type Report struct {
-	ID             string
-	AppID          string
-	Category       Category
-	Message        string
-	Email          string
-	Locale         string
-	PageURL        string
-	Metadata       map[string]string
+	ID                string
+	AppID             string
+	Category          Category
+	Message           string
+	Email             string
+	Locale            string
+	PageURL           string
+	Metadata          map[string]string
 	ClientSubmittedAt string
-	ReceivedAt     time.Time
+	ReceivedAt        time.Time
 }
 
 // ValidationError is a client-facing validation failure (maps to HTTP 400).
