@@ -12,14 +12,17 @@ CHANGELOG/ROADMAP or any validation, CORS, Turnstile, SES or logging code.
 ## Commands
 
 - `make run` — local server on `:8080` (defaults: `WELES_TURNSTILE_MODE=skip`, `WELES_NOTIFIER=stdout`)
-- `make test` / `make test-race` — CI runs `go vet ./...` plus the race variant
+- `make test` / `make test-race`
 - Single test: `go test ./internal/feedback -run 'TestValidate_Table/short_message' -count=1`
-- `make lint` — golangci-lint (not run in CI)
+- `make lint` — golangci-lint v2 including the gofmt formatter; `golangci-lint fmt` fixes formatting
 - `make build` / `make lambda-build` — server binary / Lambda `bootstrap` (linux/arm64, `lambda.norpc`)
-- `make sam-validate` — `sam validate --lint`, run in CI
+- `make sam-validate` — `sam validate --lint`
 - `make deploycheck APPS=config/apps.yaml IDENTITIES=example.com` — checks that every app's
   `fromEmail` is covered by an SES identity; deploy CI fails on it before touching SSM/SAM
 - `docker compose up --build` — local container (Turnstile skipped, stdout notifier)
+
+CI (`build-and-test`) runs vet, lint, race tests, both builds and SAM validate. golangci-lint and
+SAM CLI versions are pinned in `.github/workflows/`; keep a local golangci-lint on the same version.
 
 ## Architecture
 
@@ -52,7 +55,7 @@ Boundaries are interfaces (`config.AppRegistry`, `turnstile.Verifier`, `notify.P
   `config.prefixedEnv` when adding variables.
 - IAM for SES is fixed at deploy time (`SES_IDENTITIES` → `SesIdentityArns`). A new `fromEmail`
   domain in the apps YAML needs a redeploy, not just an SSM update.
-- `config/apps.yaml` is gitignored; only `config/apps.example.yaml` with fictional values is committed.
-- A push to `main` touching `cmd/`, `internal/`, `config/`, `template.yaml`, `Makefile` or `go.*`
-  triggers a production deploy.
+- `main` is protected by a ruleset: changes go through a PR, squash merge only, `build-and-test`
+  must pass. Merging anything that touches `cmd/`, `internal/`, `config/`, `template.yaml`,
+  `Makefile`, `go.*` or `deploy.yml` deploys to production.
 - Public contract changes must update `api/openapi.yaml` and `docs/integration.md`.
