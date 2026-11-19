@@ -294,20 +294,20 @@ func NormalizeSSMName(name string) string {
 
 // Env holds process environment configuration.
 type Env struct {
-	ListenAddr       string
-	AppsConfigPath   string
-	AppsYAML         string // optional inline YAML; preferred over file when set
-	AppsSSMParam     string // optional SSM parameter name with apps YAML
-	AppsReloadEvery  time.Duration
-	TurnstileMode    string // "cloudflare" | "skip"
-	TurnstileSecret  string // local/dev; prefer TurnstileSSM in production
-	TurnstileSSM     string // SSM SecureString parameter name
-	Notifier         string // "ses" | "stdout"
-	AWSRegion        string
-	MaxBodyBytes     int64
-	LogLevel         string
-	TrustProxyXFF    bool   // when true, prefer first X-Forwarded-For hop
-	APIStage         string // API Gateway HTTP API stage; stripped from Lambda request paths
+	ListenAddr      string
+	AppsConfigPath  string
+	AppsYAML        string // optional inline YAML; preferred over file when set
+	AppsSSMParam    string // optional SSM parameter name with apps YAML
+	AppsReloadEvery time.Duration
+	TurnstileMode   string // "cloudflare" | "skip"
+	TurnstileSecret string // local/dev; prefer TurnstileSSM in production
+	TurnstileSSM    string // SSM SecureString parameter name
+	Notifier        string // "ses" | "stdout"
+	AWSRegion       string
+	MaxBodyBytes    int64
+	LogLevel        string
+	TrustProxyXFF   bool   // when true, prefer first X-Forwarded-For hop
+	APIStage        string // API Gateway HTTP API stage; stripped from Lambda request paths
 }
 
 // LoadEnv reads configuration from environment variables with safe defaults for local use.

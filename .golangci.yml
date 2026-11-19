@@ -17,3 +17,7 @@ linters:
         - name: exported
         - name: package-comments
         - name: var-naming
+
+formatters:
+  enable:
+    - gofmt
