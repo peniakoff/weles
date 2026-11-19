@@ -3,9 +3,10 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 @AGENTS.md
+@.cursor/rules/weles.mdc
 
-Project rules live in `AGENTS.md`, `.cursor/rules/weles.mdc` and the two skills under
-`.cursor/skills/` (release docs, security). Read the relevant skill before touching
+The two skills under `.cursor/skills/` (release docs, security) are not loaded
+automatically. Read the relevant one before touching
 CHANGELOG/ROADMAP or any validation, CORS, Turnstile, SES or logging code.
 
 ## Commands
